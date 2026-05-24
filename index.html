@@ -267,40 +267,136 @@
         <h1>How to Play</h1>
       </header>
       <div class="content help-content">
-        <h2>Goal</h2>
-        <p>First to <b>10 Victory Points</b> wins.</p>
 
-        <h2>Earning Points</h2>
+        <div class="help-intro">
+          A hex-tile settlement and trading strategy game. You compete with three AI opponents to build the most prosperous frontier. The first to reach <b>10 Victory Points</b> wins.
+        </div>
+
+        <h2 class="focusable" tabindex="0">1 · The Board</h2>
+        <p>An island of 19 hexes surrounded by sea. Each land hex shows one of five resources and a number from 2&ndash;12 (except the desert, which produces nothing and hosts the robber).</p>
+        <div class="help-resgrid">
+          <div class="help-res"><span class="res-icon res-wood"></span><b>Wood</b><br><span class="text-muted">forests</span></div>
+          <div class="help-res"><span class="res-icon res-brick"></span><b>Brick</b><br><span class="text-muted">hills</span></div>
+          <div class="help-res"><span class="res-icon res-sheep"></span><b>Sheep</b><br><span class="text-muted">pasture</span></div>
+          <div class="help-res"><span class="res-icon res-wheat"></span><b>Wheat</b><br><span class="text-muted">fields</span></div>
+          <div class="help-res"><span class="res-icon res-ore"></span><b>Ore</b><br><span class="text-muted">mountains</span></div>
+        </div>
+        <p>Around the perimeter sit nine <b>ports</b>. Five give a 2:1 rate on one specific resource; four are generic 3:1 ports usable for any resource.</p>
+
+        <h2 class="focusable" tabindex="0">2 · Setup</h2>
+        <p>Turn order is randomized. Then everyone places, in <b>snake order</b> (1, 2, 3, 4, 4, 3, 2, 1):</p>
         <ul>
-          <li>Settlement = 1 VP · City = 2 VP</li>
-          <li>Longest Road (5+ continuous) = 2 VP</li>
-          <li>Largest Army (3+ knights played) = 2 VP</li>
-          <li>Victory Point dev cards = 1 VP each</li>
+          <li>A settlement on any vertex (corner) of the board</li>
+          <li>A road on one of the three edges touching that settlement</li>
+        </ul>
+        <p><b>Bonus:</b> your <i>second</i> settlement immediately yields one card of each adjacent resource &mdash; a key reason to pick a spot with a good resource mix.</p>
+        <p>Two rules constrain every settlement placement, now and later:</p>
+        <ul>
+          <li><b>Distance rule:</b> no settlement may touch a vertex adjacent to another settlement or city (yours or anyone's).</li>
+          <li>Settlements built <i>after</i> setup must also connect to one of your own roads.</li>
         </ul>
 
-        <h2>Turn</h2>
+        <h2 class="focusable" tabindex="0">3 · A Turn</h2>
         <ol>
-          <li>Roll two dice — every settlement/city next to a hex of that number produces its resource (settlement = 1, city = 2)</li>
-          <li>Build, trade, or play a dev card</li>
-          <li>End your turn</li>
+          <li><b>Roll</b> two dice.</li>
+          <li><b>Production:</b> every land hex whose number matches the roll yields resources to anyone with a piece on its corners. A settlement gets 1 card; a city gets 2.</li>
+          <li><b>Main phase:</b> build, trade, or play a development card &mdash; in any order, as many times as you can afford.</li>
+          <li><b>End turn.</b></li>
         </ol>
 
-        <h2>The Robber</h2>
-        <p>Rolling 7 — anyone holding more than 7 cards discards half. Then move the robber to a hex and steal a random card from one player there. While on a hex, that hex doesn't produce.</p>
+        <h2 class="focusable" tabindex="0">4 · Building</h2>
+        <p>Pay the cost from your hand. You're capped at 15 roads, 5 settlements, and 4 cities total.</p>
+        <div class="help-costlist">
+          <div class="help-cost">
+            <span class="help-cost-label"><b>Road</b></span>
+            <span class="cost-row">
+              <span class="ci res-wood"></span><span class="ci res-brick"></span>
+            </span>
+          </div>
+          <div class="help-cost">
+            <span class="help-cost-label"><b>Settlement</b> (+1 VP)</span>
+            <span class="cost-row">
+              <span class="ci res-wood"></span><span class="ci res-brick"></span><span class="ci res-sheep"></span><span class="ci res-wheat"></span>
+            </span>
+          </div>
+          <div class="help-cost">
+            <span class="help-cost-label"><b>City</b> (upgrades, +1 VP)</span>
+            <span class="cost-row">
+              <span class="ci res-wheat"></span><span class="ci res-wheat"></span><span class="ci res-ore"></span><span class="ci res-ore"></span><span class="ci res-ore"></span>
+            </span>
+          </div>
+          <div class="help-cost">
+            <span class="help-cost-label"><b>Dev card</b></span>
+            <span class="cost-row">
+              <span class="ci res-sheep"></span><span class="ci res-wheat"></span><span class="ci res-ore"></span>
+            </span>
+          </div>
+        </div>
+        <p>Roads must extend an unbroken chain from one of your settlements/cities. A chain is broken at any vertex where an opposing piece sits &mdash; you can't build past a rival's settlement.</p>
 
-        <h2>Costs</h2>
+        <h2 class="focusable" tabindex="0">5 · The Robber &amp; the 7</h2>
+        <p>When a 7 is rolled, no hex produces. Instead:</p>
+        <ol>
+          <li><b>Discard:</b> every player holding <b>more than 7</b> cards must discard half (rounded down) of their hand.</li>
+          <li><b>Move:</b> the roller picks a new hex for the robber. A hex with the robber on it produces <i>nothing</i> until the robber leaves.</li>
+          <li><b>Steal:</b> the roller takes one random card from any player who has a settlement or city touching the robber's new hex.</li>
+        </ol>
+        <p>The robber also moves whenever someone plays a Knight (see below).</p>
+
+        <h2 class="focusable" tabindex="0">6 · Development Cards</h2>
+        <p>The deck is shuffled at game start. There are 25 cards total. You may play <b>one</b> dev card per turn (apart from Victory Points), and never the same turn you bought it.</p>
         <ul>
-          <li><b>Road</b>: 1 wood + 1 brick</li>
-          <li><b>Settlement</b>: 1 wood + 1 brick + 1 sheep + 1 wheat</li>
-          <li><b>City</b>: 2 wheat + 3 ore (upgrades a settlement)</li>
-          <li><b>Dev Card</b>: 1 sheep + 1 wheat + 1 ore</li>
+          <li><b>Knight</b> &times;14 &mdash; move the robber and steal as if you'd rolled a 7 (but skip the discard step). Your played knights accumulate toward Largest Army.</li>
+          <li><b>Road Building</b> &times;2 &mdash; place 2 free roads immediately.</li>
+          <li><b>Year of Plenty</b> &times;2 &mdash; take any 2 resources from the bank.</li>
+          <li><b>Monopoly</b> &times;2 &mdash; name a resource. Every opponent gives you <i>all</i> of theirs.</li>
+          <li><b>Victory Point</b> &times;5 &mdash; +1 VP, held secretly until you win.</li>
         </ul>
 
-        <h2>Trading</h2>
-        <p>Bank: 4 of one resource → 1 of any. Ports give 3:1 generic or 2:1 specific. Propose trades with other players too.</p>
+        <h2 class="focusable" tabindex="0">7 · Trading</h2>
+        <p>Three ways to swap resources:</p>
+        <ul>
+          <li><b>Bank, 4:1</b> &mdash; trade four of one resource for any one.</li>
+          <li><b>Port, 3:1 or 2:1</b> &mdash; if you have a settlement/city on a generic port vertex, you trade 3:1 in any resource. A 2:1 port gives you that specific resource at the better rate. Hexland auto-detects your best rate per resource.</li>
+          <li><b>Player trade</b> &mdash; propose a deal of any cards you give and any cards you want. AI opponents accept based on their own needs and your VP &mdash; the closer you are to winning, the less generous they get.</li>
+        </ul>
 
-        <h2>D-Pad</h2>
-        <p>Arrow keys move focus. Enter selects. Esc/Back exits menus. When placing pieces, arrows move the highlight between valid spots; Enter confirms.</p>
+        <h2 class="focusable" tabindex="0">8 · Earning Victory Points</h2>
+        <ul>
+          <li>Each settlement = <b>1 VP</b></li>
+          <li>Each city = <b>2 VP</b></li>
+          <li><b>Longest Road</b> &mdash; first player to build an unbroken chain of <b>5+</b> roads earns 2 VP. If someone else later builds a longer one, the title passes. A road broken by an enemy settlement no longer counts as one chain.</li>
+          <li><b>Largest Army</b> &mdash; first player to play <b>3+</b> knights earns 2 VP. Title passes to anyone who plays more.</li>
+          <li>Each Victory Point card = <b>1 VP</b> (hidden until you win)</li>
+        </ul>
+
+        <h2 class="focusable" tabindex="0">9 · Reading the Board</h2>
+        <ul>
+          <li><b>Number probability:</b> 6 and 8 are red because they're the most common rolls (5 of 36 chances each). 2 and 12 are rarest. Pips below the number give a quick visual cue &mdash; more pips means more frequent.</li>
+          <li><b>The bank can run dry.</b> If multiple players are owed a resource the bank can't cover, no one gets any. A solo claimant takes whatever remains.</li>
+          <li>Cities double your production from the same hex, so upgrading a settlement next to a 6 or 8 is usually a strong move.</li>
+        </ul>
+
+        <h2 class="focusable" tabindex="0">10 · Strategy Tips</h2>
+        <ul>
+          <li><b>Setup matters most.</b> Pick first-settlement spots with high pip totals and resource diversity. Save your second settlement for either a port or a complementary resource set.</li>
+          <li><b>Wood + brick</b> fund expansion. <b>Wheat + ore</b> fund cities and dev cards.</li>
+          <li>Watch the leader's hand size. A 7 forces them to discard if they're over 7 &mdash; that's leverage.</li>
+          <li>Roads alone don't win games, but Longest Road's 2 VP can be the difference. Don't telegraph it too early or the AI will block you.</li>
+          <li>Holding a Monopoly is information: bide it for a moment when an opponent has stockpiled.</li>
+        </ul>
+
+        <h2 class="focusable" tabindex="0">11 · Controls (D-pad)</h2>
+        <ul>
+          <li><b>↑ ↓ ← →</b> &mdash; move focus through buttons or move the highlight cursor on the board</li>
+          <li><b>Enter / Tap</b> &mdash; confirm or activate</li>
+          <li><b>Esc / Back</b> &mdash; close a menu or popover; mandatory actions (robber move, free road, setup placement) can't be canceled</li>
+        </ul>
+        <p>Your hand, dice, and turn indicator sit in the bars above and below the board. The <b>☰</b> button opens your action menu mid-turn; <b>●●●</b> shows all players' VP, hand size, and titles.</p>
+
+        <div class="help-end">
+          Settle well. Trade sharply. Have fun.
+        </div>
       </div>
     </div>
 

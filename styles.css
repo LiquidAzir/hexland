@@ -605,20 +605,102 @@ body {
 /* ===========================================================
    HOW TO PLAY
    =========================================================== */
-.help-content { line-height: 1.5; font-size: 13px; }
+.help-content { line-height: 1.55; font-size: 13px; }
 .help-content h2 {
-  font-size: 14px; color: var(--gold);
-  text-transform: uppercase; letter-spacing: 1px;
-  margin-top: 8px;
+  font-size: 13px; color: var(--gold);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  margin-top: 14px; margin-bottom: 2px;
+  padding: 6px 10px 6px 12px;
+  border-bottom: 1px solid #2a2a3a;
+  border-left: 3px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+  scroll-margin-top: 12px;
+  scroll-margin-bottom: 12px;
 }
+.help-content h2.focusable:focus {
+  border-color: var(--gold);
+  border-left-color: var(--gold);
+  background: linear-gradient(90deg, #2a210e 0%, transparent 100%);
+  box-shadow: none;
+}
+.help-content h2:first-of-type { margin-top: 4px; }
 .help-content p, .help-content ul, .help-content ol {
   color: var(--text-secondary);
   font-size: 13px;
   padding-left: 0;
 }
 .help-content ul, .help-content ol { padding-left: 20px; }
-.help-content li { margin-bottom: 3px; }
+.help-content li { margin-bottom: 4px; line-height: 1.45; }
 .help-content b { color: var(--text-primary); }
+.help-content i { color: var(--text-primary); font-style: italic; }
+
+.help-intro {
+  background: linear-gradient(180deg, #1a1408 0%, #14141f 100%);
+  border-left: 3px solid var(--gold);
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.help-resgrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+.help-res {
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-primary);
+  border: 1px solid #2a2a3a;
+}
+.help-res .res-icon {
+  display: block;
+  margin: 0 auto 4px;
+  width: 22px; height: 22px;
+}
+.help-res .text-muted { font-size: 10px; }
+
+.help-costlist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0;
+}
+.help-cost {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid #2a2a3a;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.help-cost-label { flex: 1; }
+.help-cost .cost-row { flex-shrink: 0; gap: 3px; }
+.help-cost .ci { width: 16px; height: 16px; }
+
+.help-end {
+  margin-top: 16px;
+  padding: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--gold);
+  letter-spacing: 1px;
+  font-style: italic;
+  border-top: 1px solid #2a2a3a;
+}
 
 /* ===========================================================
    GAME OVER
