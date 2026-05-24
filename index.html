@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+  <title>Hexland</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ MAIN MENU ============ -->
+    <div id="menu" class="screen">
+      <div class="menu-bg"></div>
+      <div class="menu-inner">
+        <div class="logo">
+          <div class="logo-mark">
+            <svg viewBox="-50 -50 100 100" width="120" height="120">
+              <polygon points="0,-44 38,-22 38,22 0,44 -38,22 -38,-22"
+                       fill="url(#logoGrad)" stroke="#e8c890" stroke-width="2"/>
+              <polygon points="0,-26 22,-13 22,13 0,26 -22,13 -22,-13"
+                       fill="none" stroke="#e8c890" stroke-width="1.5" opacity="0.6"/>
+              <defs>
+                <radialGradient id="logoGrad" cx="50%" cy="40%">
+                  <stop offset="0%" stop-color="#3a5d3a"/>
+                  <stop offset="100%" stop-color="#1a2d1a"/>
+                </radialGradient>
+              </defs>
+            </svg>
+          </div>
+          <h1 class="logo-title">HEXLAND</h1>
+          <p class="logo-tag">Settle · Build · Trade</p>
+        </div>
+        <nav class="menu-nav">
+          <button class="menu-btn primary focusable" data-action="new-game">New Game</button>
+          <button class="menu-btn focusable" data-action="continue-game">Continue</button>
+          <button class="menu-btn focusable" data-action="how-to-play">How to Play</button>
+        </nav>
+      </div>
+    </div>
+
+    <!-- ============ SETUP / NEW GAME ============ -->
+    <div id="setup" class="screen hidden">
+      <header class="header">
+        <button class="back-btn focusable" data-action="back">&#8592;</button>
+        <h1>New Game</h1>
+      </header>
+      <div class="content">
+        <div class="setup-section">
+          <div class="section-label">Your Name</div>
+          <input type="text" id="player-name-input" class="text-input focusable"
+                 maxlength="12" placeholder="Player" value="You">
+        </div>
+        <div class="setup-section">
+          <div class="section-label">Your Color</div>
+          <div class="color-grid" id="color-picker">
+            <button class="color-swatch focusable" data-color="red"
+                    style="--c:#d64545"></button>
+            <button class="color-swatch focusable" data-color="blue"
+                    style="--c:#3a7ad8"></button>
+            <button class="color-swatch focusable" data-color="orange"
+                    style="--c:#e89a3a"></button>
+            <button class="color-swatch focusable" data-color="white"
+                    style="--c:#e8e8e8"></button>
+          </div>
+        </div>
+        <div class="setup-section">
+          <div class="section-label">AI Difficulty</div>
+          <div class="seg-control" id="difficulty-picker">
+            <button class="seg-btn focusable" data-diff="easy">Easy</button>
+            <button class="seg-btn focusable active" data-diff="normal">Normal</button>
+            <button class="seg-btn focusable" data-diff="hard">Hard</button>
+          </div>
+        </div>
+      </div>
+      <nav class="nav-bar">
+        <button class="nav-item primary focusable" data-action="start-game">Begin</button>
+      </nav>
+    </div>
+
+    <!-- ============ GAME BOARD (main play screen) ============ -->
+    <div id="game" class="screen hidden">
+      <div class="game-topbar" id="game-topbar">
+        <div class="player-pill" id="player-pill-self">
+          <span class="pp-color" id="pp-self-color"></span>
+          <span class="pp-vp" id="pp-self-vp">0</span>
+        </div>
+        <div class="turn-indicator" id="turn-indicator">Your Turn</div>
+        <div class="dice-display" id="dice-display">
+          <span class="die" id="die1">–</span>
+          <span class="die" id="die2">–</span>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <svg id="board-svg" viewBox="-300 -260 600 520" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="board-overlay" id="board-overlay"></div>
+        <div class="cursor-hint" id="cursor-hint"></div>
+      </div>
+
+      <div class="game-bottombar" id="game-bottombar">
+        <div class="resource-strip" id="resource-strip">
+          <div class="res-chip" data-res="wood">
+            <span class="res-icon res-wood"></span><span class="res-count" id="rc-wood">0</span>
+          </div>
+          <div class="res-chip" data-res="brick">
+            <span class="res-icon res-brick"></span><span class="res-count" id="rc-brick">0</span>
+          </div>
+          <div class="res-chip" data-res="sheep">
+            <span class="res-icon res-sheep"></span><span class="res-count" id="rc-sheep">0</span>
+          </div>
+          <div class="res-chip" data-res="wheat">
+            <span class="res-icon res-wheat"></span><span class="res-count" id="rc-wheat">0</span>
+          </div>
+          <div class="res-chip" data-res="ore">
+            <span class="res-icon res-ore"></span><span class="res-count" id="rc-ore">0</span>
+          </div>
+          <div class="res-chip dev-chip" data-res="dev" id="dev-chip">
+            <span class="res-icon res-dev"></span><span class="res-count" id="rc-dev">0</span>
+          </div>
+        </div>
+        <div class="action-strip" id="action-strip">
+          <button class="act-btn focusable" data-action="menu" id="btn-menu" title="Menu">☰</button>
+          <button class="act-btn primary focusable" data-action="primary" id="btn-primary">Roll</button>
+          <button class="act-btn focusable" data-action="players" id="btn-players" title="Players">●●●</button>
+        </div>
+      </div>
+
+      <!-- floating action menu -->
+      <div class="popover hidden" id="action-menu">
+        <div class="popover-title">Actions</div>
+        <div class="popover-list">
+          <button class="pop-item focusable" data-action="build-road">
+            <span class="cost-row"><span class="ci res-wood"></span><span class="ci res-brick"></span></span>
+            <span class="pop-label">Build Road</span>
+          </button>
+          <button class="pop-item focusable" data-action="build-settlement">
+            <span class="cost-row"><span class="ci res-wood"></span><span class="ci res-brick"></span><span class="ci res-sheep"></span><span class="ci res-wheat"></span></span>
+            <span class="pop-label">Build Settlement</span>
+          </button>
+          <button class="pop-item focusable" data-action="build-city">
+            <span class="cost-row"><span class="ci res-wheat"></span><span class="ci res-wheat"></span><span class="ci res-ore"></span><span class="ci res-ore"></span><span class="ci res-ore"></span></span>
+            <span class="pop-label">Upgrade to City</span>
+          </button>
+          <button class="pop-item focusable" data-action="buy-dev">
+            <span class="cost-row"><span class="ci res-sheep"></span><span class="ci res-wheat"></span><span class="ci res-ore"></span></span>
+            <span class="pop-label">Buy Dev Card</span>
+          </button>
+          <button class="pop-item focusable" data-action="play-dev">
+            <span class="cost-row"><span class="ci res-dev"></span></span>
+            <span class="pop-label">Play Dev Card</span>
+          </button>
+          <button class="pop-item focusable" data-action="trade-bank">
+            <span class="cost-row"><span class="ci ci-text">4:1</span></span>
+            <span class="pop-label">Trade with Bank</span>
+          </button>
+          <button class="pop-item focusable" data-action="trade-players">
+            <span class="cost-row"><span class="ci ci-text">↔</span></span>
+            <span class="pop-label">Trade with Players</span>
+          </button>
+          <button class="pop-item focusable" data-action="end-turn">
+            <span class="cost-row"><span class="ci ci-text">→</span></span>
+            <span class="pop-label">End Turn</span>
+          </button>
+          <button class="pop-item focusable cancel-item" data-action="close-popover">
+            <span class="pop-label">Cancel</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- dev card selection popover -->
+      <div class="popover hidden" id="dev-menu">
+        <div class="popover-title">Play Development Card</div>
+        <div class="popover-list" id="dev-menu-list"></div>
+        <button class="pop-item focusable cancel-item" data-action="close-popover">
+          <span class="pop-label">Cancel</span>
+        </button>
+      </div>
+
+      <!-- players overview popover -->
+      <div class="popover hidden" id="players-menu">
+        <div class="popover-title">Players</div>
+        <div class="players-list" id="players-list"></div>
+        <button class="pop-item focusable cancel-item" data-action="close-popover">
+          <span class="pop-label">Close</span>
+        </button>
+      </div>
+
+      <!-- cursor mode indicator (when picking vertex/edge/hex) -->
+      <div class="mode-banner hidden" id="mode-banner">
+        <span id="mode-banner-text">Choose location</span>
+        <button class="mode-cancel focusable" data-action="cancel-mode">Cancel</button>
+      </div>
+
+      <!-- toast for events -->
+      <div class="event-toast hidden" id="event-toast"></div>
+    </div>
+
+    <!-- ============ DISCARD SCREEN (on 7) ============ -->
+    <div id="discard" class="screen hidden">
+      <header class="header">
+        <h1>Robber! Discard <span id="discard-target">0</span></h1>
+      </header>
+      <div class="content">
+        <p class="discard-help">You have more than 7 cards. Select cards to discard.</p>
+        <div class="discard-grid" id="discard-grid"></div>
+        <div class="discard-status">
+          Selected: <span id="discard-count">0</span> / <span id="discard-need">0</span>
+        </div>
+      </div>
+      <nav class="nav-bar">
+        <button class="nav-item primary focusable" data-action="confirm-discard" id="btn-confirm-discard">Discard</button>
+      </nav>
+    </div>
+
+    <!-- ============ TRADE WITH BANK ============ -->
+    <div id="trade-bank" class="screen hidden">
+      <header class="header">
+        <button class="back-btn focusable" data-action="back">&#8592;</button>
+        <h1>Trade with Bank</h1>
+      </header>
+      <div class="content">
+        <div class="trade-section">
+          <div class="section-label">Give <span id="bank-give-rate">(4:1)</span></div>
+          <div class="trade-row" id="bank-give-row"></div>
+        </div>
+        <div class="trade-section">
+          <div class="section-label">Receive (1)</div>
+          <div class="trade-row" id="bank-recv-row"></div>
+        </div>
+        <div class="trade-summary" id="bank-trade-summary">Pick a resource to give and one to receive.</div>
+      </div>
+      <nav class="nav-bar">
+        <button class="nav-item primary focusable" data-action="confirm-bank-trade" id="btn-bank-trade">Trade</button>
+      </nav>
+    </div>
+
+    <!-- ============ TRADE WITH PLAYERS ============ -->
+    <div id="trade-players" class="screen hidden">
+      <header class="header">
+        <button class="back-btn focusable" data-action="back">&#8592;</button>
+        <h1>Propose Trade</h1>
+      </header>
+      <div class="content">
+        <div class="trade-section">
+          <div class="section-label">You give</div>
+          <div class="trade-counter-row" id="pt-give-row"></div>
+        </div>
+        <div class="trade-section">
+          <div class="section-label">You receive</div>
+          <div class="trade-counter-row" id="pt-recv-row"></div>
+        </div>
+        <div class="trade-responses" id="trade-responses"></div>
+      </div>
+      <nav class="nav-bar">
+        <button class="nav-item focusable" data-action="reset-trade">Reset</button>
+        <button class="nav-item primary focusable" data-action="propose-trade" id="btn-propose-trade">Propose</button>
+      </nav>
+    </div>
+
+    <!-- ============ HOW TO PLAY ============ -->
+    <div id="how-to-play" class="screen hidden">
+      <header class="header">
+        <button class="back-btn focusable" data-action="back">&#8592;</button>
+        <h1>How to Play</h1>
+      </header>
+      <div class="content help-content">
+        <h2>Goal</h2>
+        <p>First to <b>10 Victory Points</b> wins.</p>
+
+        <h2>Earning Points</h2>
+        <ul>
+          <li>Settlement = 1 VP · City = 2 VP</li>
+          <li>Longest Road (5+ continuous) = 2 VP</li>
+          <li>Largest Army (3+ knights played) = 2 VP</li>
+          <li>Victory Point dev cards = 1 VP each</li>
+        </ul>
+
+        <h2>Turn</h2>
+        <ol>
+          <li>Roll two dice — every settlement/city next to a hex of that number produces its resource (settlement = 1, city = 2)</li>
+          <li>Build, trade, or play a dev card</li>
+          <li>End your turn</li>
+        </ol>
+
+        <h2>The Robber</h2>
+        <p>Rolling 7 — anyone holding more than 7 cards discards half. Then move the robber to a hex and steal a random card from one player there. While on a hex, that hex doesn't produce.</p>
+
+        <h2>Costs</h2>
+        <ul>
+          <li><b>Road</b>: 1 wood + 1 brick</li>
+          <li><b>Settlement</b>: 1 wood + 1 brick + 1 sheep + 1 wheat</li>
+          <li><b>City</b>: 2 wheat + 3 ore (upgrades a settlement)</li>
+          <li><b>Dev Card</b>: 1 sheep + 1 wheat + 1 ore</li>
+        </ul>
+
+        <h2>Trading</h2>
+        <p>Bank: 4 of one resource → 1 of any. Ports give 3:1 generic or 2:1 specific. Propose trades with other players too.</p>
+
+        <h2>D-Pad</h2>
+        <p>Arrow keys move focus. Enter selects. Esc/Back exits menus. When placing pieces, arrows move the highlight between valid spots; Enter confirms.</p>
+      </div>
+    </div>
+
+    <!-- ============ GAME OVER ============ -->
+    <div id="game-over" class="screen hidden">
+      <div class="gameover-inner">
+        <div class="gameover-trophy" id="gameover-trophy">★</div>
+        <h1 id="gameover-title">Victory</h1>
+        <div class="gameover-winner" id="gameover-winner">You win!</div>
+        <div class="gameover-scores" id="gameover-scores"></div>
+      </div>
+      <nav class="nav-bar">
+        <button class="nav-item focusable" data-action="go-menu">Main Menu</button>
+        <button class="nav-item primary focusable" data-action="new-game">Play Again</button>
+      </nav>
+    </div>
+
+  </div>
+
+  <script src="js/board.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

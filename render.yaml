@@ -1,0 +1,38 @@
+services:
+  # Production: tracks `main`. URL: https://hexland.onrender.com
+  - type: web
+    name: hexland
+    runtime: static
+    branch: main
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+
+  # Staging: tracks `staging`. URL: https://hexland-staging.onrender.com
+  - type: web
+    name: hexland-staging
+    runtime: static
+    branch: staging
+    buildCommand: ""
+    staticPublishPath: .
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
