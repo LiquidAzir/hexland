@@ -159,14 +159,21 @@
       case 'steal-pick':         doStealPick(parseInt(el.dataset.with, 10)); break;
 
       // Setup-screen pickers
-      default:
+      case 'set-color':
         if (el.dataset.color) {
           app.setup.playerColor = el.dataset.color;
           HL.UI.setColorSwatch(el.dataset.color);
-        } else if (el.dataset.diff) {
+        }
+        break;
+      case 'set-diff':
+        if (el.dataset.diff) {
           app.setup.difficulty = el.dataset.diff;
           HL.UI.setDifficulty(el.dataset.diff);
         }
+        break;
+
+      default:
+        break;
     }
   }
 
