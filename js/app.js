@@ -408,16 +408,48 @@
     setTimeout(function() {
       // Settlement
       var vid = HL.AI.pickInitialSettlement(state, setupP.idx);
+      if (!vid) {
+        forceSetupAdvance(state);
+        refreshGame();
+        setTimeout(driveTurns, 200);
+        return;
+      }
       HL.Game.placeInitialSettlement(state, vid);
       refreshGame();
       setTimeout(function() {
         // Road
         var eid = HL.AI.pickInitialRoad(state, setupP.idx);
-        if (eid) HL.Game.placeInitialRoad(state, eid);
+        if (!eid) {
+          // Defensive fallback — any unoccupied edge of the just-placed settlement
+          var v = state.board.verticesById[state.setupLastVertex];
+          if (v) {
+            for (var i = 0; i < v.adjEdges.length; i++) {
+              var candidate = v.adjEdges[i];
+              var occupied = state.players.some(function(p){ return p.roads[candidate]; });
+              if (!occupied) { eid = candidate; break; }
+            }
+          }
+        }
+        if (eid) {
+          HL.Game.placeInitialRoad(state, eid);
+        } else {
+          forceSetupAdvance(state);
+        }
         refreshGame();
         setTimeout(driveTurns, 300);
       }, 350);
     }, 300);
+  }
+
+  function forceSetupAdvance(state) {
+    state.setupLastVertex = null;
+    state.setupExpecting = 'settlement';
+    state.setupIndex++;
+    if (state.setupIndex >= state.setupOrder.length) {
+      state.phase = 'play';
+      state.turnState = 'roll';
+      state.currentPlayerIdx = state.setupOrder[0];
+    }
   }
 
   // ===== AI: turn =====
@@ -748,10 +780,10 @@
       b.innerHTML = '<span class="cost-row"><span class="ci res-' + res + '"></span></span><span class="pop-label">' + res + '</span>';
       list.appendChild(b);
     });
-    HL.UI.openPopover('action-menu');
+    HL.UI.openPopover('action-menu', { mandatory: true });
   }
   function doResolveMonopoly(res) {
-    HL.UI.closePopover();
+    HL.UI.closePopover(true);
     HL.Game.resolveMonopoly(app.game, res);
     refreshGame();
     restoreActionMenu();
@@ -777,7 +809,7 @@
       b.innerHTML = '<span class="cost-row"><span class="ci res-' + res + '"></span></span><span class="pop-label">' + res + ' <span class="text-muted" style="font-size:11px">(bank: ' + app.game.bank[res] + ')</span></span>';
       list.appendChild(b);
     });
-    HL.UI.openPopover('action-menu');
+    HL.UI.openPopover('action-menu', { mandatory: true });
   }
   function doResolvePlenty(res) {
     app.game._plentyPicked.push(res);
@@ -785,7 +817,7 @@
       showPlentyMenu();
       return;
     }
-    HL.UI.closePopover();
+    HL.UI.closePopover(true);
     HL.Game.resolvePlenty(app.game, app.game._plentyPicked);
     refreshGame();
     restoreActionMenu();
@@ -959,13 +991,13 @@
       b.innerHTML = '<span class="cost-row"><span style="display:inline-block;width:14px;height:14px;background:' + HL.Render.PLAYER_HEX[p.color].fill + ';border-radius:50%"></span></span><span class="pop-label">' + p.name + ' (' + HL.Game.totalCards(p.hand) + ' cards)</span>';
       list.appendChild(b);
     });
-    HL.UI.openPopover('action-menu');
+    HL.UI.openPopover('action-menu', { mandatory: true });
   }
 
   function doStealPick(idx) {
     var state = app.game;
     HL.Game.stealCard(state, idx);
-    HL.UI.closePopover();
+    HL.UI.closePopover(true);
     restoreActionMenu();
     refreshGame();
     checkWinAndDrive();

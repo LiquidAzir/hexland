@@ -109,17 +109,28 @@ window.HL = window.HL || {};
   }
 
   // ===== Popovers =====
-  function openPopoverEl(id) {
-    closePopover();
+  // openPopoverEl(id, { mandatory: true }) — required-choice popover (can't be dismissed)
+  function openPopoverEl(id, opts) {
+    opts = opts || {};
+    closePopover(true);  // force-close any prior popover
     var el = document.getElementById(id);
     if (!el) return;
     el.classList.remove('hidden');
+    el._mandatory = !!opts.mandatory;
     openPopover = el;
+    // Hide its cancel item if mandatory
+    var cancelBtn = el.querySelector('.cancel-item');
+    if (cancelBtn) cancelBtn.style.display = el._mandatory ? 'none' : '';
     focusFirst(el);
   }
-  function closePopover() {
+  function closePopover(force) {
     if (openPopover) {
+      if (openPopover._mandatory && !force) {
+        toast('Required action — pick one');
+        return;
+      }
       openPopover.classList.add('hidden');
+      openPopover._mandatory = false;
       openPopover = null;
       // Restore focus to primary button if on game screen
       var bp = document.getElementById('btn-primary');

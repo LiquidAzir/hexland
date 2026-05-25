@@ -578,47 +578,73 @@ window.HL = window.HL || {};
 
   // ====== Achievements ======
   function recomputeLongestRoad(state) {
-    var bestIdx = state.longestRoadOwner;
-    var bestLen = state.longestRoadLen;
+    // 1. Recompute everyone's current length (chains may have been broken)
     state.players.forEach(function(p) {
-      var len = HL.Board.longestRoadFor(state.board, state.players, p.idx);
-      p.longestRoadLen = len;
-      if (len >= 5 && len > bestLen) {
-        bestLen = len;
+      p.longestRoadLen = HL.Board.longestRoadFor(state.board, state.players, p.idx);
+    });
+
+    var holder = state.longestRoadOwner !== null
+      ? state.players[state.longestRoadOwner] : null;
+
+    // 2. Holder drops the title if their chain is below 5
+    if (holder && holder.longestRoadLen < 5) {
+      if (holder.idx === 0) pushEvent(state, 'You lost Longest Road');
+      else pushEvent(state, holder.name + ' lost Longest Road');
+      state.longestRoadOwner = null;
+      state.longestRoadLen = 4;
+      holder = null;
+    }
+
+    // 3. Find the player (if any) with strictly greater than the current threshold
+    //    threshold = holder's length (must beat them), or 4 (must reach 5+)
+    var threshold = holder ? holder.longestRoadLen : 4;
+    var bestIdx = null, bestLen = threshold;
+    state.players.forEach(function(p) {
+      if (p.longestRoadLen > bestLen) {
+        bestLen = p.longestRoadLen;
         bestIdx = p.idx;
       }
     });
-    // Check if current holder still has a road >= bestLen
-    if (state.longestRoadOwner !== null) {
-      var holder = state.players[state.longestRoadOwner];
-      if (holder.longestRoadLen < 5) {
-        // lost it
-        state.longestRoadOwner = null;
-        state.longestRoadLen = 4;
-      }
-    }
-    if (bestIdx !== state.longestRoadOwner && bestLen >= 5) {
+
+    if (bestIdx !== null && bestIdx !== state.longestRoadOwner) {
+      // Transfer (or first-take)
       state.longestRoadOwner = bestIdx;
       state.longestRoadLen = bestLen;
       if (bestIdx === 0) pushEvent(state, 'You took Longest Road!');
       else pushEvent(state, state.players[bestIdx].name + ' took Longest Road');
+    } else if (state.longestRoadOwner !== null) {
+      // Holder still holds — update recorded length in case they extended
+      state.longestRoadLen = state.players[state.longestRoadOwner].longestRoadLen;
     }
   }
 
   function recomputeLargestArmy(state) {
-    var bestIdx = state.largestArmyOwner;
-    var bestSize = state.largestArmySize;
+    var holder = state.largestArmyOwner !== null
+      ? state.players[state.largestArmyOwner] : null;
+
+    // Defensive (knights only ever increase, but guard anyway)
+    if (holder && holder.knightsPlayed < 3) {
+      state.largestArmyOwner = null;
+      state.largestArmySize = 2;
+      holder = null;
+    }
+
+    var threshold = holder ? holder.knightsPlayed : 2;
+    var bestIdx = null, bestSize = threshold;
     state.players.forEach(function(p) {
-      if (p.knightsPlayed >= 3 && p.knightsPlayed > bestSize) {
+      if (p.knightsPlayed > bestSize) {
         bestSize = p.knightsPlayed;
         bestIdx = p.idx;
       }
     });
-    if (bestIdx !== state.largestArmyOwner && bestSize >= 3) {
+
+    if (bestIdx !== null && bestIdx !== state.largestArmyOwner) {
       state.largestArmyOwner = bestIdx;
       state.largestArmySize = bestSize;
       if (bestIdx === 0) pushEvent(state, 'You took Largest Army!');
       else pushEvent(state, state.players[bestIdx].name + ' took Largest Army');
+    } else if (state.largestArmyOwner !== null) {
+      state.largestArmySize = state.players[state.largestArmyOwner].knightsPlayed;
     }
   }
 
