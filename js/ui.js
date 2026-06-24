@@ -260,6 +260,15 @@ window.HL = window.HL || {};
     if (cb) cb(id);
   }
 
+  // Tap-to-place: jump cursor to clicked id and confirm
+  function setCursorAndConfirm(state, id) {
+    if (!cursor) return false;
+    if (cursor.candidates.indexOf(id) === -1) return false;
+    cursor.cursorId = id;
+    confirmCursor();
+    return true;
+  }
+
   // ===== Banner / toasts =====
   function showBanner(text, mandatory) {
     var b = document.getElementById('mode-banner');
@@ -715,6 +724,7 @@ window.HL = window.HL || {};
     startTilePick: startTilePick,
     moveCursor: moveCursor,
     confirmCursor: confirmCursor,
+    setCursorAndConfirm: setCursorAndConfirm,
     cancelCursor: cancelCursor,
     isCursorActive: isCursorActive,
     cursorMode: cursorMode,

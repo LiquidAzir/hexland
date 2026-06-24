@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=600, height=600, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Hexland</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.webmanifest">
@@ -95,7 +95,7 @@
       </div>
 
       <div class="board-wrap">
-        <svg id="board-svg" viewBox="-300 -260 600 520" preserveAspectRatio="xMidYMid meet"></svg>
+        <svg id="board-svg" viewBox="-260 -235 520 470" preserveAspectRatio="xMidYMid meet"></svg>
         <div class="board-overlay" id="board-overlay"></div>
         <div class="cursor-hint" id="cursor-hint"></div>
       </div>
@@ -386,10 +386,12 @@
           <li>Holding a Monopoly is information: bide it for a moment when an opponent has stockpiled.</li>
         </ul>
 
-        <h2 class="focusable" tabindex="0">11 · Controls (D-pad)</h2>
+        <h2 class="focusable" tabindex="0">11 · Controls</h2>
+        <p>Hexland plays on glasses (D-pad), phone (touch), and desktop (mouse + keyboard).</p>
         <ul>
+          <li><b>Tap / click</b> &mdash; activate a button, or pick a spot directly on the board during placement</li>
           <li><b>↑ ↓ ← →</b> &mdash; move focus through buttons or move the highlight cursor on the board</li>
-          <li><b>Enter / Tap</b> &mdash; confirm or activate</li>
+          <li><b>Enter</b> &mdash; confirm the focused button or the highlighted board spot</li>
           <li><b>Esc / Back</b> &mdash; close a menu or popover; mandatory actions (robber move, free road, setup placement) can't be canceled</li>
         </ul>
         <p>Your hand, dice, and turn indicator sit in the bars above and below the board. The <b>☰</b> button opens your action menu mid-turn; <b>●●●</b> shows all players' VP, hand size, and titles.</p>

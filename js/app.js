@@ -23,9 +23,70 @@
   function init() {
     HL.UI.init();
     wireEvents();
+    wireBoardClicks();
+    setupResponsiveScaling();
     loadSaved();
     refreshMenuButtons();
     HL.UI.go('menu', { history: false });
+  }
+
+  // ===== Responsive scaling (phone/desktop, transparent on glasses) =====
+  function setupResponsiveScaling() {
+    var app = document.getElementById('app');
+    function applyScale() {
+      var vw = window.innerWidth;
+      var vh = window.innerHeight;
+      // On exactly 600x600 (glasses) — no scale needed
+      var scale = Math.min(vw / 600, vh / 600);
+      if (Math.abs(scale - 1) < 0.01) {
+        app.style.transform = '';
+      } else {
+        app.style.transform = 'scale(' + scale + ')';
+      }
+    }
+    applyScale();
+    window.addEventListener('resize', applyScale);
+    window.addEventListener('orientationchange', applyScale);
+  }
+
+  // ===== Board click/tap handlers (tap-to-place) =====
+  function wireBoardClicks() {
+    var svg = document.getElementById('board-svg');
+    if (!svg) return;
+
+    function findAttr(el, name) {
+      while (el && el !== svg && el.nodeType === 1) {
+        if (el.hasAttribute && el.hasAttribute(name)) return el.getAttribute(name);
+        el = el.parentNode;
+      }
+      return null;
+    }
+
+    function tryConfirm(target) {
+      if (!HL.UI.isCursorActive()) return false;
+      var mode = HL.UI.cursorMode();
+      var id;
+      if (mode === 'vertex-pick') id = findAttr(target, 'data-vid');
+      else if (mode === 'edge-pick') id = findAttr(target, 'data-eid');
+      else if (mode === 'tile-pick') id = findAttr(target, 'data-tid');
+      if (!id) return false;
+      var ok = HL.UI.setCursorAndConfirm(app.game, id);
+      if (ok) afterCursorConfirm();
+      return ok;
+    }
+
+    // pointerdown fires reliably on touch + mouse + pen
+    svg.addEventListener('pointerdown', function(e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      if (tryConfirm(e.target)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    });
+    // click as a fallback (in case pointer events are stopped by something else)
+    svg.addEventListener('click', function(e) {
+      tryConfirm(e.target);
+    });
   }
 
   function loadSaved() {

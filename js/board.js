@@ -7,7 +7,7 @@ window.HL = window.HL || {};
   'use strict';
 
   // ===== Geometry =====
-  var R = 42;                          // hex radius (vertex distance from center)
+  var R = 48;                          // hex radius (vertex distance from center)
   var SQRT3 = Math.sqrt(3);
   var W = R * SQRT3;                   // hex width (pointy-top)
   var H = 2 * R;                       // hex height
@@ -216,8 +216,8 @@ window.HL = window.HL || {};
       };
       // Normalize and extend outward for icon position
       var mag = Math.sqrt(port.ox * port.ox + port.oy * port.oy) || 1;
-      port.iconX = edge.x + (port.ox / mag) * 22;
-      port.iconY = edge.y + (port.oy / mag) * 22;
+      port.iconX = edge.x + (port.ox / mag) * 26;
+      port.iconY = edge.y + (port.oy / mag) * 26;
       ports.push(port);
       // Tag the vertices as having this port
       var vA = vertList.find(function(v){return v.id===edge.v1;});

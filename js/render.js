@@ -169,7 +169,7 @@ window.HL = window.HL || {};
     var R = state.board.R;
 
     // 1. Sea backdrop circle behind the island
-    el('circle', { cx: 0, cy: 0, r: 240, fill: 'url(#sea-bg)' }, svg);
+    el('circle', { cx: 0, cy: 0, r: 270, fill: 'url(#sea-bg)' }, svg);
 
     // 2. Port connector lines (drawn first so under hexes' edges)
     var portsLayer = el('g', { class: 'ports-layer' }, svg);
@@ -229,7 +229,7 @@ window.HL = window.HL || {};
     state.board.ports.forEach(function(port) {
       var label = port.res === '?' ? '3:1' : portShortLabel(port.res);
       var fill = port.res === '?' ? '#f4e8c8' : portFill(port.res);
-      el('circle', { cx: port.iconX, cy: port.iconY, r: 11, class: 'port-circle', fill: fill }, portsIconLayer);
+      el('circle', { cx: port.iconX, cy: port.iconY, r: 14, class: 'port-circle', fill: fill }, portsIconLayer);
       el('text', { x: port.iconX, y: port.iconY + 0.5, class: 'port-icon', text: label }, portsIconLayer);
     });
 
@@ -237,18 +237,18 @@ window.HL = window.HL || {};
     var tokenLayer = el('g', { class: 'token-layer' }, svg);
     state.board.tiles.forEach(function(tile) {
       if (!tile.token || tile.hasRobber) return;
-      el('circle', { cx: tile.x, cy: tile.y, r: 12, class: 'hex-num-bg' }, tokenLayer);
+      el('circle', { cx: tile.x, cy: tile.y, r: 16, class: 'hex-num-bg' }, tokenLayer);
       var cls = (tile.token === 6 || tile.token === 8) ? 'hex-num hex-num-red' : 'hex-num hex-num-blk';
       el('text', { x: tile.x, y: tile.y - 1, class: cls, text: String(tile.token) }, tokenLayer);
       // Pips below
       var pips = tokenPips(tile.token);
-      var pipSize = 1.3;
-      var pipGap = 2.4;
+      var pipSize = 1.8;
+      var pipGap = 3.2;
       var pipsWidth = (pips - 1) * pipGap;
       for (var i = 0; i < pips; i++) {
         el('circle', {
           cx: tile.x - pipsWidth / 2 + i * pipGap,
-          cy: tile.y + 6,
+          cy: tile.y + 8,
           r: pipSize,
           class: 'hex-num-dots',
           fill: (tile.token === 6 || tile.token === 8) ? '#c83030' : '#1a1408'
@@ -282,7 +282,7 @@ window.HL = window.HL || {};
 
     // 8. Robber piece
     var rt = state.board.tiles.find(function(t){return t.id === state.board.robberTileId;});
-    if (rt) drawRobber(svg, rt.x, rt.y + 14);
+    if (rt) drawRobber(svg, rt.x, rt.y + 16);
 
     // 9. Overlay layers for cursor highlights (placement mode)
     el('g', { id: 'overlay-vertices' }, svg);
@@ -310,13 +310,13 @@ window.HL = window.HL || {};
     var p = PLAYER_HEX[color];
     // House: pentagon shape with roof
     el('polygon', {
-      points: '-6,-3 -6,5 6,5 6,-3 0,-9',
+      points: '-8,-4 -8,6 8,6 8,-4 0,-11',
       fill: 'url(#pg-' + color + ')',
       stroke: '#0a0a0f',
-      'stroke-width': '0.8'
+      'stroke-width': '1'
     }, g);
     // tiny door
-    el('rect', { x: -1.5, y: 1, width: 3, height: 4, fill: p.dark }, g);
+    el('rect', { x: -2, y: 1, width: 4, height: 5, fill: p.dark }, g);
     return g;
   }
 
@@ -325,19 +325,19 @@ window.HL = window.HL || {};
     var p = PLAYER_HEX[color];
     // Two-block city
     el('polygon', {
-      points: '-9,-1 -9,6 -2,6 -2,-1 -6,-6',
+      points: '-11,-1 -11,8 -2,8 -2,-1 -7,-7',
       fill: 'url(#pg-' + color + ')',
       stroke: '#0a0a0f',
-      'stroke-width': '0.8'
+      'stroke-width': '1'
     }, g);
     el('polygon', {
-      points: '-2,-5 -2,6 8,6 8,-5 3,-10',
+      points: '-2,-6 -2,8 10,8 10,-6 4,-12',
       fill: 'url(#pg-' + color + ')',
       stroke: '#0a0a0f',
-      'stroke-width': '0.8'
+      'stroke-width': '1'
     }, g);
-    el('rect', { x: -7, y: 2, width: 2, height: 3, fill: p.dark }, g);
-    el('rect', { x: 1.5, y: 1, width: 2.5, height: 5, fill: p.dark }, g);
+    el('rect', { x: -9, y: 3, width: 3, height: 4, fill: p.dark }, g);
+    el('rect', { x: 2, y: 2, width: 3, height: 6, fill: p.dark }, g);
     return g;
   }
 
@@ -350,11 +350,11 @@ window.HL = window.HL || {};
     var g = el('g', { class: 'road', transform: 'translate(' + mx + ',' + my + ') rotate(' + ang + ')' }, layer);
     var p = PLAYER_HEX[color];
     el('rect', {
-      x: -len/2 + 4, y: -3, width: len - 8, height: 6,
+      x: -len/2 + 4, y: -3.5, width: len - 8, height: 7,
       fill: 'url(#pg-' + color + ')',
       stroke: '#0a0a0f',
-      'stroke-width': '0.6',
-      rx: 1.5
+      'stroke-width': '0.8',
+      rx: 2
     }, g);
     return g;
   }
@@ -362,10 +362,10 @@ window.HL = window.HL || {};
   function drawRobber(svg, cx, cy) {
     var g = el('g', { class: 'robber-piece', transform: 'translate(' + cx + ',' + cy + ')' }, svg);
     // Hooded figure silhouette
-    el('ellipse', { cx: 0, cy: 4, rx: 7, ry: 5, fill: '#1a1408' }, g);
-    el('circle',  { cx: 0, cy: -3, r: 5, fill: '#1a1408' }, g);
-    el('circle',  { cx: -1.5, cy: -3, r: 0.8, fill: '#ffaa00' }, g);
-    el('circle',  { cx:  1.5, cy: -3, r: 0.8, fill: '#ffaa00' }, g);
+    el('ellipse', { cx: 0, cy: 5, rx: 9, ry: 6, fill: '#1a1408' }, g);
+    el('circle',  { cx: 0, cy: -3, r: 6, fill: '#1a1408' }, g);
+    el('circle',  { cx: -2, cy: -3, r: 1, fill: '#ffaa00' }, g);
+    el('circle',  { cx:  2, cy: -3, r: 1, fill: '#ffaa00' }, g);
     return g;
   }
 
@@ -384,16 +384,23 @@ window.HL = window.HL || {};
     while (cursorLayer.firstChild) cursorLayer.removeChild(cursorLayer.firstChild);
     vertexIds.forEach(function(vid) {
       var v = state.board.verticesById[vid];
-      var c = el('circle', {
-        cx: v.x, cy: v.y, r: 6,
+      el('circle', {
+        cx: v.x, cy: v.y, r: 8,
         class: 'vertex-spot candidate',
+        'data-vid': vid,
+        'pointer-events': 'none'
+      }, layer);
+      // Larger transparent hit target for touch/mouse
+      el('circle', {
+        cx: v.x, cy: v.y, r: 16,
+        class: 'vertex-hit',
         'data-vid': vid
       }, layer);
     });
     if (cursorId) {
       var cv = state.board.verticesById[cursorId];
       if (cv) {
-        el('circle', { cx: cv.x, cy: cv.y, r: 9, class: 'vertex-spot cursor' }, cursorLayer);
+        el('circle', { cx: cv.x, cy: cv.y, r: 11, class: 'vertex-spot cursor' }, cursorLayer);
       }
     }
   }
@@ -407,9 +414,17 @@ window.HL = window.HL || {};
       var e = state.board.edgesById[eid];
       var v1 = state.board.verticesById[e.v1];
       var v2 = state.board.verticesById[e.v2];
+      // Visible dashed line (no pointer events)
       el('line', {
         x1: v1.x, y1: v1.y, x2: v2.x, y2: v2.y,
         class: 'edge-spot',
+        'data-eid': eid,
+        'pointer-events': 'none'
+      }, layer);
+      // Fat invisible hit target for touch/mouse
+      el('line', {
+        x1: v1.x, y1: v1.y, x2: v2.x, y2: v2.y,
+        class: 'edge-hit',
         'data-eid': eid
       }, layer);
     });
@@ -428,10 +443,20 @@ window.HL = window.HL || {};
     var cursorLayer = svg.querySelector('#overlay-cursor');
     while (layer.firstChild) layer.removeChild(layer.firstChild);
     while (cursorLayer.firstChild) cursorLayer.removeChild(cursorLayer.firstChild);
-    // Add subtle ring on each candidate tile
+    // Add subtle ring + clickable hit area on each candidate tile
     tileIds.forEach(function(tid) {
       var t = state.board.tiles.find(function(tt){return tt.id===tid;});
       if (!t) return;
+      // Invisible click target on the full hex
+      el('polygon', {
+        points: hexPoints(t.x, t.y, state.board.R),
+        fill: '#ffd96601',
+        stroke: 'none',
+        class: 'tile-spot',
+        'data-tid': tid,
+        style: 'cursor:pointer'
+      }, layer);
+      // Visible dashed ring on top
       el('polygon', {
         points: hexPoints(t.x, t.y, state.board.R + 1),
         fill: 'none',
