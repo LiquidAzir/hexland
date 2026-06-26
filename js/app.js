@@ -192,7 +192,7 @@
       // Menu
       case 'new-game':       startNewGameFlow(); break;
       case 'continue-game':  continueGame(); break;
-      case 'how-to-play':    HL.UI.go('how-to-play'); break;
+      case 'how-to-play':    HL.UI.closePopover(true); HL.UI.go('how-to-play'); break;
       case 'back':           HL.UI.back(); break;
       case 'go-menu':        HL.UI.go('menu', { history: false }); break;
 

@@ -201,6 +201,10 @@
             <span class="cost-row"><span class="ci ci-text">→</span></span>
             <span class="pop-label">End Turn</span>
           </button>
+          <button class="pop-item focusable" data-action="how-to-play">
+            <span class="cost-row"><span class="ci ci-text">?</span></span>
+            <span class="pop-label">How to Play</span>
+          </button>
           <button class="pop-item focusable cancel-item" data-action="close-popover">
             <span class="pop-label">Cancel</span>
           </button>
@@ -414,13 +418,70 @@
           <li>Cities double your production from the same hex, so upgrading a settlement next to a 6 or 8 is usually a strong move.</li>
         </ul>
 
-        <h2 class="focusable" tabindex="0">10 · Strategy Tips</h2>
+        <h2 class="focusable" tabindex="0">10 · Strategy</h2>
+
+        <p><b>Opening (setup).</b> The two settlements you place define your whole game.</p>
         <ul>
-          <li><b>Setup matters most.</b> Pick first-settlement spots with high pip totals and resource diversity. Save your second settlement for either a port or a complementary resource set.</li>
-          <li><b>Wood + brick</b> fund expansion. <b>Wheat + ore</b> fund cities and dev cards.</li>
-          <li>Watch the leader's hand size. A 7 forces them to discard if they're over 7 &mdash; that's leverage.</li>
-          <li>Roads alone don't win games, but Longest Road's 2 VP can be the difference. Don't telegraph it too early or the AI will block you.</li>
-          <li>Holding a Monopoly is information: bide it for a moment when an opponent has stockpiled.</li>
+          <li><b>Count pips.</b> Each hex's pip total is its expected production. A spot touching 8+10+5 (5+3+4 = 12 pips) produces far more than 9+11+4 (4+2+3 = 9). Always pick the higher pip total over a "pretty" spot.</li>
+          <li><b>Resource diversity beats raw pips.</b> A spot touching three different resources lets you build everything; a triple-wood spot starves on every other roll.</li>
+          <li><b>Pick a strategy with your second settlement.</b> Either a <i>port</i> (commit to that resource as your trade engine), a <i>complementary resource set</i> (covers what your first spot misses), or a <i>high-pip city target</i> (gold for upgrades later). All three are valid — pick one.</li>
+          <li><b>Two viable archetypes:</b> <b>wood+brick</b> for fast roads/settlements (think Longest Road), or <b>wheat+ore</b> for cities + dev cards (think Largest Army). The board often favors one over the other — read it before you place.</li>
+          <li><b>Your first road points toward your next settlement.</b> Don't pick a "safe" road direction — pick the one that opens a high-value future spot before someone else takes it.</li>
+        </ul>
+
+        <p><b>Resource economics.</b></p>
+        <ul>
+          <li><b>Wheat is king.</b> It's in every building cost except road, and city upgrades need two. Never let your wheat production drop to zero.</li>
+          <li><b>Ore</b> is hoarded — it builds cities (3) and dev cards (1). Without ore you can't reach 10 VP through cities; you'll have to chase Longest Road or VP cards.</li>
+          <li><b>Sheep</b> looks weak but it's in settlements + dev cards + 2:1 ports. A sheep port is one of the best in the game.</li>
+          <li><b>Wood + brick</b> are paired on road and settlement costs. If you have one without the other, you have nothing.</li>
+        </ul>
+
+        <p><b>Building priorities.</b></p>
+        <ul>
+          <li><b>Upgrade settlements to cities</b> as soon as you can afford it &mdash; you double production at that spot and gain a VP. Always your top priority on a good hex.</li>
+          <li><b>Second settlement on a port</b> if the resource matches your strongest production. A 2:1 sheep port + steady sheep makes you self-sufficient on trades.</li>
+          <li>Don't build a road just because you can. Roads cost wood+brick and only score the +2 VP for Longest Road. Every other build is more direct VP.</li>
+          <li><b>Buy dev cards</b> when you have nothing better. They're 1-VP-equivalent on average (mostly knights + 20% VP cards) and the surprise plays win games.</li>
+        </ul>
+
+        <p><b>Dev card timing.</b></p>
+        <ul>
+          <li><b>Knight</b> is both attack and defense. Play one early to grab Largest Army (3 knights = +2 VP) before others stack up.</li>
+          <li><b>Knight before rolling</b> moves the robber off you on the same turn the dice could hurt you. Always look at your blocked tile before each roll.</li>
+          <li><b>Road Building</b> is a Longest Road ambush: don't reveal your road plans, then drop two roads in one turn for the +2 VP swing.</li>
+          <li><b>Monopoly</b> is best after a high-roll turn where opponents stockpiled. Aim at the resource the leader is sitting on.</li>
+          <li><b>Year of Plenty</b> closes deals: take the exact 2 resources to complete a city or settlement that turn.</li>
+        </ul>
+
+        <p><b>The robber.</b></p>
+        <ul>
+          <li><b>Block the leader's best hex</b> &mdash; usually a 6 or 8 next to their city. Don't waste a robber on a 2 or 12.</li>
+          <li><b>Steal from whoever has the resource you need most.</b> A wheat-rich opponent is the highest-value target if you're stuck on a city.</li>
+          <li>If everyone has 0 or 1 cards, moving the robber is still worth it to <i>cut production</i>. Stealing nothing is fine if you also blocked a 5-pip hex.</li>
+          <li><b>Don't rob a player who can't win soon.</b> Help yourself first; antagonize the leader, not the player at 3 VP.</li>
+        </ul>
+
+        <p><b>Trading.</b></p>
+        <ul>
+          <li><b>Don't trade with the leader.</b> If someone is at 7+ visible VP, propose to anyone else first. The AI in Hexland already refuses trades that boost the close-to-winning proposer.</li>
+          <li><b>Trade 2-for-1 with a port</b> before going 4-for-1 with the bank. If you have a sheep port and 4 sheep, take 2 wheat &mdash; that's a city closer.</li>
+          <li><b>Hold back one resource</b> the leader needs. If they're one wheat away from a city, refuse all wheat trades with them this turn.</li>
+        </ul>
+
+        <p><b>Longest Road &amp; Largest Army.</b></p>
+        <ul>
+          <li>Each is +2 VP &mdash; that's 20% of the game. Always know who currently holds each, and who's one card away from taking it.</li>
+          <li><b>Longest Road is a trap if you don't have wood+brick.</b> A 5-road chain costs 10 cards; if you don't have steady wood+brick production, you'll never extend it past someone else's 6.</li>
+          <li><b>An enemy settlement breaks your chain at that vertex.</b> If a rival is about to overtake your LR, build a settlement that interrupts <i>their</i> chain.</li>
+        </ul>
+
+        <p><b>Endgame &amp; reading opponents.</b></p>
+        <ul>
+          <li>Track visible VP + dev card count for every opponent. If someone has 8 visible VP and 3 dev cards, assume two of them are VP cards &mdash; they can win on their next turn.</li>
+          <li><b>Hide your VP cards</b> until the winning turn. Don't telegraph that you're at 9.</li>
+          <li>From 8 VP onward, opponents will trade-block, robber-block, and refuse you everything. <b>Surprise wins matter</b> &mdash; save a Road Building or VP card reveal for the kill turn.</li>
+          <li>The fastest closing play: have all 4 resources for a settlement + 2 wheat + 3 ore (settle + immediately upgrade to city = +3 VP in one turn).</li>
         </ul>
 
         <h2 class="focusable" tabindex="0">11 · Controls</h2>
@@ -465,12 +526,12 @@
 
   </div>
 
-  <script src="js/sound.js?v=4"></script>
-  <script src="js/board.js?v=4"></script>
-  <script src="js/ai.js?v=4"></script>
-  <script src="js/game.js?v=4"></script>
-  <script src="js/render.js?v=4"></script>
-  <script src="js/ui.js?v=4"></script>
-  <script src="js/app.js?v=4"></script>
+  <script src="js/sound.js?v=5"></script>
+  <script src="js/board.js?v=5"></script>
+  <script src="js/ai.js?v=5"></script>
+  <script src="js/game.js?v=5"></script>
+  <script src="js/render.js?v=5"></script>
+  <script src="js/ui.js?v=5"></script>
+  <script src="js/app.js?v=5"></script>
 </body>
 </html>
