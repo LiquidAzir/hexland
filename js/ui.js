@@ -307,7 +307,7 @@ window.HL = window.HL || {};
 
   // ===== Updates =====
   function updateHud(state) {
-    var p = state.players[0]; // human
+    var p = state.players[state.localHumanIdx || 0]; // current human at device
     document.getElementById('rc-wood').textContent = p.hand.wood;
     document.getElementById('rc-brick').textContent = p.hand.brick;
     document.getElementById('rc-sheep').textContent = p.hand.sheep;
@@ -332,12 +332,13 @@ window.HL = window.HL || {};
     var cp = state.players[state.currentPlayerIdx];
     if (state.phase === 'setup') {
       var setupP = HL.Game.currentSetupPlayer(state);
-      ti.textContent = (setupP.idx === 0 ? 'Place ' : setupP.name + ' places ') + (state.setupExpecting);
-      ti.classList.toggle('active', setupP.idx === 0);
+      var isLocal = setupP.idx === (state.localHumanIdx || 0) && !setupP.isAI;
+      ti.textContent = (isLocal ? 'Place ' : setupP.name + ' places ') + (state.setupExpecting);
+      ti.classList.toggle('active', isLocal);
     } else if (state.phase === 'play') {
-      if (cp.idx === 0) {
-        ti.textContent = 'Your turn — ' + state.turnState;
-        ti.classList.add('active');
+      if (cp.idx === (state.localHumanIdx || 0)) {
+        ti.textContent = (cp.isAI ? cp.name + "'s turn" : 'Your turn — ' + state.turnState);
+        ti.classList.toggle('active', !cp.isAI);
       } else {
         ti.textContent = cp.name + "'s turn";
         ti.classList.remove('active');
@@ -357,11 +358,12 @@ window.HL = window.HL || {};
 
     // Primary button text
     var bp = document.getElementById('btn-primary');
+    var localIdx = state.localHumanIdx || 0;
     if (state.phase === 'setup') {
       bp.textContent = state.setupExpecting === 'settlement' ? 'Place Settlement' : 'Place Road';
-      bp.disabled = state.players[state.setupOrder[state.setupIndex]].idx !== 0;
+      bp.disabled = state.players[state.setupOrder[state.setupIndex]].idx !== localIdx;
     } else if (state.phase === 'play') {
-      if (cp.idx !== 0) {
+      if (cp.idx !== localIdx || cp.isAI) {
         bp.textContent = 'Waiting...';
         bp.disabled = true;
       } else if (state.turnState === 'roll') {
@@ -373,9 +375,9 @@ window.HL = window.HL || {};
       }
     }
 
-    // Menu button enabled only on player's main turn
+    // Menu button enabled only on local player's main turn
     var btnMenu = document.getElementById('btn-menu');
-    btnMenu.disabled = !(state.phase === 'play' && cp.idx === 0 && state.turnState === 'main');
+    btnMenu.disabled = !(state.phase === 'play' && cp.idx === localIdx && !cp.isAI && state.turnState === 'main');
 
     // Dev chip on/off
     var devChip = document.getElementById('dev-chip');
@@ -393,7 +395,7 @@ window.HL = window.HL || {};
 
   // ===== Populate menus dynamically =====
   function populateActionMenu(state) {
-    var p = state.players[0];
+    var p = state.players[state.localHumanIdx || 0];
     function setEnabled(action, ok) {
       var el = document.querySelector('#action-menu [data-action="' + action + '"]');
       if (el) el.disabled = !ok;
@@ -427,7 +429,7 @@ window.HL = window.HL || {};
   }
 
   function populateDevMenu(state) {
-    var p = state.players[0];
+    var p = state.players[state.localHumanIdx || 0];
     var list = document.getElementById('dev-menu-list');
     list.innerHTML = '';
 
@@ -471,14 +473,18 @@ window.HL = window.HL || {};
   function populatePlayersMenu(state) {
     var list = document.getElementById('players-list');
     list.innerHTML = '';
+    var localIdx = state.localHumanIdx || 0;
     state.players.forEach(function(p) {
       var row = document.createElement('div');
       row.className = 'player-row' +
         (p.idx === state.currentPlayerIdx ? ' is-turn' : '');
       row.style.borderLeftColor = HL.Render.PLAYER_HEX[p.color].fill;
       var vp = HL.Game.visibleVP(state, p);
+      var nameSuffix = p.isAI
+        ? ' <span class="text-muted" style="font-weight:400">(' + p.aiStyle + ')</span>'
+        : (p.idx === localIdx ? ' (you)' : ' <span class="text-muted" style="font-weight:400">(human)</span>');
       row.innerHTML =
-        '<span class="pr-name">' + esc(p.name) + (p.isAI ? ' <span class="text-muted" style="font-weight:400">(' + p.aiStyle + ')</span>' : ' (you)') + '</span>' +
+        '<span class="pr-name">' + esc(p.name) + nameSuffix + '</span>' +
         '<span class="pr-stats">' +
           '<span class="stat">★ <b style="color:#e8c890">' + vp + '</b></span>' +
           '<span class="stat">' + HL.Game.totalCards(p.hand) + ' cards</span>' +
@@ -530,7 +536,7 @@ window.HL = window.HL || {};
 
   // ===== Trade Bank screen =====
   function setupBankTradeScreen(state) {
-    var p = state.players[0];
+    var p = state.players[state.localHumanIdx || 0];
     var ports = HL.Board.playerPorts(state.board, p);
     state._bankTrade = { give: null, gain: null };
     var giveRow = document.getElementById('bank-give-row');
@@ -581,7 +587,7 @@ window.HL = window.HL || {};
     var summary = document.getElementById('bank-trade-summary');
     var btn = document.getElementById('btn-bank-trade');
     if (bt.give && bt.gain && bt.give !== bt.gain) {
-      var ports = HL.Board.playerPorts(state.board, state.players[0]);
+      var ports = HL.Board.playerPorts(state.board, state.players[state.localHumanIdx || 0]);
       var rate = ports[bt.give] || 4;
       summary.textContent = rate + ' ' + bt.give + ' → 1 ' + bt.gain;
       btn.disabled = false;
@@ -595,7 +601,7 @@ window.HL = window.HL || {};
 
   // ===== Trade Players screen =====
   function setupPlayerTradeScreen(state) {
-    var p = state.players[0];
+    var p = state.players[state.localHumanIdx || 0];
     state._playerTrade = {
       give: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 },
       recv: { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 }
@@ -636,7 +642,7 @@ window.HL = window.HL || {};
 
   function refreshPlayerTradeScreen(state) {
     var pt = state._playerTrade;
-    var p = state.players[0];
+    var p = state.players[state.localHumanIdx || 0];
     var giveTotal = 0, recvTotal = 0;
     ['wood','brick','sheep','wheat','ore'].forEach(function(res) {
       document.getElementById('pt-give-' + res).textContent = pt.give[res];
@@ -669,10 +675,11 @@ window.HL = window.HL || {};
   // ===== Game over =====
   function showGameOver(state) {
     var winner = state.players[state.winnerIdx];
-    document.getElementById('gameover-title').textContent = winner.idx === 0 ? 'VICTORY' : 'DEFEAT';
-    document.getElementById('gameover-trophy').textContent = winner.idx === 0 ? '★' : '☼';
+    var humanWon = !winner.isAI;
+    document.getElementById('gameover-title').textContent = humanWon ? 'VICTORY' : 'DEFEAT';
+    document.getElementById('gameover-trophy').textContent = humanWon ? '★' : '☼';
     document.getElementById('gameover-winner').textContent =
-      winner.idx === 0 ? 'You win!' : winner.name + ' wins with ' + HL.Game.totalVP(state, winner) + ' VP';
+      humanWon ? (winner.name + ' wins!') : winner.name + ' wins with ' + HL.Game.totalVP(state, winner) + ' VP';
     var scores = document.getElementById('gameover-scores');
     scores.innerHTML = '';
     var sorted = state.players.slice().sort(function(a,b){
@@ -683,7 +690,7 @@ window.HL = window.HL || {};
       row.className = 'gameover-score-row';
       row.style.borderLeftColor = HL.Render.PLAYER_HEX[p.color].fill;
       row.innerHTML =
-        '<span class="gs-name">' + esc(p.name) + (p.idx === 0 ? ' (you)' : '') + '</span>' +
+        '<span class="gs-name">' + esc(p.name) + (p.isAI ? '' : ' (human)') + '</span>' +
         '<span class="gs-vp">' + HL.Game.totalVP(state, p) + ' VP</span>';
       scores.appendChild(row);
     });
@@ -699,6 +706,26 @@ window.HL = window.HL || {};
     document.querySelectorAll('#difficulty-picker .seg-btn').forEach(function(s){
       s.classList.toggle('active', s.dataset.diff === diff);
     });
+  }
+  // Generic seg-control setter: matches by any data-* whose name matches the segId prefix.
+  function setOptionSeg(segId, value) {
+    var seg = document.getElementById(segId);
+    if (!seg) return;
+    seg.querySelectorAll('.seg-btn').forEach(function(btn) {
+      // Find the relevant data attr (only one should differ besides data-action)
+      var on = false;
+      for (var i = 0; i < btn.attributes.length; i++) {
+        var a = btn.attributes[i];
+        if (a.name.indexOf('data-') === 0 && a.name !== 'data-action') {
+          if (a.value === String(value)) on = true;
+        }
+      }
+      btn.classList.toggle('active', on);
+    });
+  }
+  function setToggle(id, on) {
+    var el = document.getElementById(id);
+    if (el) el.classList.toggle('on', !!on);
   }
 
   // ===== util =====
@@ -748,6 +775,8 @@ window.HL = window.HL || {};
     showGameOver: showGameOver,
     setColorSwatch: setColorSwatch,
     setDifficulty: setDifficulty,
+    setOptionSeg: setOptionSeg,
+    setToggle: setToggle,
 
     toast: toast
   };

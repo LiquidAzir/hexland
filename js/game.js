@@ -61,29 +61,32 @@ window.HL = window.HL || {};
     var rng = HL.Board.mulberry32(seed);
     var board = HL.Board.buildBoard(seed);
 
-    var playerName = opts.playerName || 'You';
-    var playerColor = opts.playerColor || 'red';
-    var aiColors = ['red', 'blue', 'orange', 'white'].filter(function(c){ return c !== playerColor; });
+    var humans = opts.humans || [{ name: opts.playerName || 'You', color: opts.playerColor || 'red' }];
+    var totalPlayers = 4;  // base game always 4
+    var aiCount = Math.max(0, totalPlayers - humans.length);
 
-    var aiNames = ['Riku', 'Mara', 'Tovin'];
+    var humanColors = humans.map(function(h){ return h.color; });
+    var allColors = ['red', 'blue', 'orange', 'white'];
+    var aiColors = allColors.filter(function(c){ return humanColors.indexOf(c) === -1; });
+
+    var aiNames = (HL.AI && HL.AI.pickAINames ? HL.AI.pickAINames(aiCount, rng) : ['Riku', 'Mara', 'Tovin'].slice(0, aiCount));
     var aiStyles = ['aggressive', 'builder', 'trader'];
-    // shuffle so order varies
-    HL.Board.shuffle(aiNames, rng);
     HL.Board.shuffle(aiStyles, rng);
 
-    var players = [
-      newPlayer(0, playerName, playerColor, false)
-    ];
-    for (var i = 0; i < 3; i++) {
-      players.push(newPlayer(i + 1, aiNames[i], aiColors[i], true, aiStyles[i]));
+    var players = [];
+    for (var h = 0; h < humans.length; h++) {
+      players.push(newPlayer(h, humans[h].name, humans[h].color, false));
+    }
+    for (var i = 0; i < aiCount; i++) {
+      players.push(newPlayer(humans.length + i, aiNames[i], aiColors[i], true, aiStyles[i % aiStyles.length]));
     }
 
     // Decide starting player randomly
-    var startIdx = Math.floor(rng() * 4);
+    var startIdx = Math.floor(rng() * totalPlayers);
 
     // Build setup order: snake — startIdx, +1, +2, +3, then +3, +2, +1, startIdx
     var firstRound = [];
-    for (var i = 0; i < 4; i++) firstRound.push((startIdx + i) % 4);
+    for (var i = 0; i < totalPlayers; i++) firstRound.push((startIdx + i) % totalPlayers);
     var setupOrder = firstRound.concat(firstRound.slice().reverse());
 
     return {
@@ -92,6 +95,14 @@ window.HL = window.HL || {};
       board: board,
       players: players,
       difficulty: opts.difficulty || 'normal',
+
+      // Variant settings
+      winVP: opts.winVP || 10,
+      noRobber: !!opts.noRobber,
+
+      // Index of human currently using the device (for pass-and-play handoff).
+      // First human is index 0; in single-player this stays 0 forever.
+      localHumanIdx: 0,
 
       // phase: 'setup' | 'play' | 'over'
       phase: 'setup',
@@ -234,6 +245,11 @@ window.HL = window.HL || {};
     state.diceHistory.push(sum);
     pushEvent(state, state.players[state.currentPlayerIdx].name + ' rolled ' + sum);
 
+    if (sum === 7 && state.noRobber) {
+      pushEvent(state, 'Lucky 7 — chill mode, no robber');
+      state.turnState = 'main';
+      return { sum: sum, dice: state.lastDice, robber: false, chill: true };
+    }
     if (sum === 7) {
       // Trigger robber phase: discard then move
       state.discardQueue = [];
@@ -402,9 +418,9 @@ window.HL = window.HL || {};
     state.turnState = state._postRobberState || 'main';
     state._postRobberState = null;
     if (stolen) {
-      if (m.idx === 0) pushEvent(state, 'You stole ' + stolen + ' from ' + v.name);
-      else if (v.idx === 0) pushEvent(state, m.name + ' stole ' + stolen + ' from you');
-      else pushEvent(state, m.name + ' stole from ' + v.name);
+      pushEvent(state, m.name + ' stole ' + stolen + ' from ' + v.name);
+    } else {
+      pushEvent(state, m.name + ' stole from ' + v.name);
     }
     return { stole: stolen, from: victimIdx };
   }
@@ -478,6 +494,11 @@ window.HL = window.HL || {};
       p.knightsPlayed += 1;
       pushEvent(state, p.name + ' played a Knight');
       recomputeLargestArmy(state);
+      if (state.noRobber) {
+        // Chill mode: knight just counts toward Largest Army
+        checkWin(state);
+        return { ok: true, kind: 'knight', needRobber: false };
+      }
       // Knight can be played BEFORE rolling — remember so we return to 'roll' after robber
       if (state.turnState === 'roll') state._postRobberState = 'roll';
       state.robberMover = p.idx;
@@ -569,7 +590,7 @@ window.HL = window.HL || {};
       p.devPending[k] = 0;
     }
     p.devPlayedThisTurn = false;
-    state.currentPlayerIdx = (state.currentPlayerIdx + 1) % 4;
+    state.currentPlayerIdx = (state.currentPlayerIdx + 1) % state.players.length;
     state.turnState = 'roll';
     state.lastDice = null;
     state.pendingTrade = null;
@@ -588,8 +609,7 @@ window.HL = window.HL || {};
 
     // 2. Holder drops the title if their chain is below 5
     if (holder && holder.longestRoadLen < 5) {
-      if (holder.idx === 0) pushEvent(state, 'You lost Longest Road');
-      else pushEvent(state, holder.name + ' lost Longest Road');
+      pushEvent(state, holder.name + ' lost Longest Road');
       state.longestRoadOwner = null;
       state.longestRoadLen = 4;
       holder = null;
@@ -610,8 +630,7 @@ window.HL = window.HL || {};
       // Transfer (or first-take)
       state.longestRoadOwner = bestIdx;
       state.longestRoadLen = bestLen;
-      if (bestIdx === 0) pushEvent(state, 'You took Longest Road!');
-      else pushEvent(state, state.players[bestIdx].name + ' took Longest Road');
+      pushEvent(state, state.players[bestIdx].name + ' took Longest Road');
     } else if (state.longestRoadOwner !== null) {
       // Holder still holds — update recorded length in case they extended
       state.longestRoadLen = state.players[state.longestRoadOwner].longestRoadLen;
@@ -641,8 +660,7 @@ window.HL = window.HL || {};
     if (bestIdx !== null && bestIdx !== state.largestArmyOwner) {
       state.largestArmyOwner = bestIdx;
       state.largestArmySize = bestSize;
-      if (bestIdx === 0) pushEvent(state, 'You took Largest Army!');
-      else pushEvent(state, state.players[bestIdx].name + ' took Largest Army');
+      pushEvent(state, state.players[bestIdx].name + ' took Largest Army');
     } else if (state.largestArmyOwner !== null) {
       state.largestArmySize = state.players[state.largestArmyOwner].knightsPlayed;
     }
@@ -650,7 +668,7 @@ window.HL = window.HL || {};
 
   function checkWin(state) {
     for (var i = 0; i < state.players.length; i++) {
-      if (totalVP(state, state.players[i]) >= 10) {
+      if (totalVP(state, state.players[i]) >= (state.winVP || 10)) {
         state.phase = 'over';
         state.winnerIdx = i;
         pushEvent(state, state.players[i].name + ' wins!');

@@ -74,6 +74,43 @@
             <button class="seg-btn focusable" data-action="set-diff" data-diff="hard">Hard</button>
           </div>
         </div>
+
+        <button class="more-options-btn focusable" data-action="toggle-more-options">
+          <span id="more-options-arrow">▸</span> More options
+        </button>
+        <div id="more-options" class="hidden more-options-panel">
+          <div class="setup-section">
+            <div class="section-label">Humans (pass &amp; play)</div>
+            <div class="seg-control" id="humans-picker">
+              <button class="seg-btn focusable active" data-action="set-humans" data-humans="1">1</button>
+              <button class="seg-btn focusable" data-action="set-humans" data-humans="2">2</button>
+              <button class="seg-btn focusable" data-action="set-humans" data-humans="3">3</button>
+              <button class="seg-btn focusable" data-action="set-humans" data-humans="4">4</button>
+            </div>
+          </div>
+          <div class="setup-section">
+            <div class="section-label">Win at</div>
+            <div class="seg-control" id="winvp-picker">
+              <button class="seg-btn focusable" data-action="set-winvp" data-winvp="8">8 VP — sprint</button>
+              <button class="seg-btn focusable active" data-action="set-winvp" data-winvp="10">10 VP — standard</button>
+              <button class="seg-btn focusable" data-action="set-winvp" data-winvp="12">12 VP — long</button>
+            </div>
+          </div>
+          <div class="setup-section">
+            <div class="opt-row">
+              <span class="opt-label"><b>Sound</b><br><span class="text-muted">dice, builds, robber</span></span>
+              <button class="opt-toggle focusable on" id="sound-toggle" data-action="toggle-sound">
+                <span class="opt-toggle-knob"></span>
+              </button>
+            </div>
+            <div class="opt-row">
+              <span class="opt-label"><b>Robber</b><br><span class="text-muted">turn off for chill mode</span></span>
+              <button class="opt-toggle focusable on" id="robber-toggle" data-action="toggle-robber">
+                <span class="opt-toggle-knob"></span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
       <nav class="nav-bar">
         <button class="nav-item primary focusable" data-action="start-game">Begin</button>
@@ -416,13 +453,24 @@
       </nav>
     </div>
 
+    <!-- ============ PASS-AND-PLAY HANDOFF OVERLAY ============ -->
+    <div id="handoff-overlay" class="hidden handoff-overlay">
+      <div class="handoff-inner">
+        <div class="handoff-swatch" id="handoff-swatch"></div>
+        <div class="handoff-name" id="handoff-name">Player 2</div>
+        <div class="handoff-sub">Pass the device. Tap when ready.</div>
+        <button class="nav-item primary focusable" id="handoff-ready" data-action="handoff-ready">I'm Ready</button>
+      </div>
+    </div>
+
   </div>
 
-  <script src="js/board.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/ai.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/sound.js?v=4"></script>
+  <script src="js/board.js?v=4"></script>
+  <script src="js/ai.js?v=4"></script>
+  <script src="js/game.js?v=4"></script>
+  <script src="js/render.js?v=4"></script>
+  <script src="js/ui.js?v=4"></script>
+  <script src="js/app.js?v=4"></script>
 </body>
 </html>

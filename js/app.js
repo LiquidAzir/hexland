@@ -11,10 +11,17 @@
     setup: {
       playerName: 'You',
       playerColor: 'red',
-      difficulty: 'normal'
+      difficulty: 'normal',
+      // Variant settings — defaults match the base game
+      winVP: 10,
+      noRobber: false,
+      humanCount: 1,             // 1-4 humans, rest filled with AI to 4
+      humans: null,              // populated at beginGame from playerName+playerColor + extras
+      sound: true
     },
-    game: null,  // live game state
-    savedGame: null
+    game: null,
+    savedGame: null,
+    pendingAction: null          // queued callback after handoff
   };
 
   var STORAGE_KEY = 'hexland_save_v1';
@@ -22,6 +29,12 @@
   // ===== Boot =====
   function init() {
     HL.UI.init();
+    // Restore sound preference
+    try {
+      var s = localStorage.getItem('hexland_setup_sound');
+      if (s === '0') app.setup.sound = false;
+    } catch(e) {}
+    HL.Sound.setMuted(!app.setup.sound);
     wireEvents();
     wireBoardClicks();
     setupResponsiveScaling();
@@ -120,6 +133,17 @@
 
   // ===== Event wiring =====
   function wireEvents() {
+    // Resume Web Audio on first user gesture (required by browsers)
+    var resumeOnce = function() {
+      HL.Sound.resume();
+      document.removeEventListener('pointerdown', resumeOnce);
+      document.removeEventListener('click', resumeOnce);
+      document.removeEventListener('keydown', resumeOnce);
+    };
+    document.addEventListener('pointerdown', resumeOnce);
+    document.addEventListener('click', resumeOnce);
+    document.addEventListener('keydown', resumeOnce);
+
     document.addEventListener('click', function(e) {
       var el = e.target.closest('[data-action]');
       if (!el) return;
@@ -232,6 +256,34 @@
           HL.UI.setDifficulty(el.dataset.diff);
         }
         break;
+      case 'toggle-more-options':
+        document.getElementById('more-options').classList.toggle('hidden');
+        document.getElementById('more-options-arrow').textContent =
+          document.getElementById('more-options').classList.contains('hidden') ? '▸' : '▾';
+        break;
+      case 'set-winvp':
+        app.setup.winVP = parseInt(el.dataset.winvp, 10) || 10;
+        HL.UI.setOptionSeg('winvp-picker', el.dataset.winvp);
+        break;
+      case 'set-humans':
+        app.setup.humanCount = parseInt(el.dataset.humans, 10) || 1;
+        HL.UI.setOptionSeg('humans-picker', el.dataset.humans);
+        break;
+      case 'toggle-sound':
+        app.setup.sound = !app.setup.sound;
+        HL.Sound.setMuted(!app.setup.sound);
+        HL.UI.setToggle('sound-toggle', app.setup.sound);
+        try { localStorage.setItem('hexland_setup_sound', app.setup.sound ? '1' : '0'); } catch(e){}
+        break;
+      case 'toggle-robber':
+        app.setup.noRobber = !app.setup.noRobber;
+        HL.UI.setToggle('robber-toggle', !app.setup.noRobber);
+        break;
+
+      // Pass-and-play handoff
+      case 'handoff-ready':
+        if (app.pendingAction) { var pa = app.pendingAction; app.pendingAction = null; pa(); }
+        break;
 
       default:
         break;
@@ -243,6 +295,10 @@
     HL.UI.go('setup');
     HL.UI.setColorSwatch(app.setup.playerColor);
     HL.UI.setDifficulty(app.setup.difficulty);
+    HL.UI.setOptionSeg('humans-picker', app.setup.humanCount);
+    HL.UI.setOptionSeg('winvp-picker', app.setup.winVP);
+    HL.UI.setToggle('sound-toggle', app.setup.sound);
+    HL.UI.setToggle('robber-toggle', !app.setup.noRobber);
     var input = document.getElementById('player-name-input');
     if (input) input.value = app.setup.playerName;
   }
@@ -269,16 +325,81 @@
     var nameInput = document.getElementById('player-name-input');
     if (nameInput) app.setup.playerName = (nameInput.value || 'You').slice(0, 12);
 
+    // Apply sound preference
+    HL.Sound.setMuted(!app.setup.sound);
+
+    // Build humans array from setup
+    var humans = buildHumansFromSetup();
+
     app.game = HL.Game.newGame({
-      playerName: app.setup.playerName,
-      playerColor: app.setup.playerColor,
+      humans: humans,
       difficulty: app.setup.difficulty,
+      winVP: app.setup.winVP,
+      noRobber: app.setup.noRobber,
       seed: (Date.now() ^ Math.floor(Math.random()*1e9)) >>> 0
     });
 
     HL.UI.go('game', { history: false });
     refreshGame();
     setTimeout(driveTurns, 250);
+  }
+
+  // Build humans list. Player 1 always = the user's name+color from Setup.
+  // Extra humans get generic names + unused colors.
+  function buildHumansFromSetup() {
+    var allColors = ['red', 'blue', 'orange', 'white'];
+    var firstColor = app.setup.playerColor;
+    var rest = allColors.filter(function(c){ return c !== firstColor; });
+    var humans = [{ name: app.setup.playerName || 'You', color: firstColor }];
+    var defaultNames = ['Player 2', 'Player 3', 'Player 4'];
+    for (var i = 1; i < (app.setup.humanCount || 1); i++) {
+      humans.push({ name: defaultNames[i - 1], color: rest[i - 1] });
+    }
+    return humans;
+  }
+
+  // ===== Pass-and-play handoff =====
+  // If the active player (setup or play) is a human OTHER than the local one,
+  // pause control and show a handoff prompt. Otherwise just run `next`.
+  function ensureLocalIsCurrentHuman(state, next) {
+    var active;
+    if (state.phase === 'setup') {
+      active = HL.Game.currentSetupPlayer(state);
+    } else if (state.phase === 'play') {
+      if (state.turnState === 'robber-discard' && state.discardCurrent) {
+        active = state.players[state.discardCurrent.idx];
+      } else {
+        active = state.players[state.currentPlayerIdx];
+      }
+    }
+    if (!active || active.isAI) { next(); return; }
+    if (active.idx === state.localHumanIdx) { next(); return; }
+    // Defensive: single-human game (or unset localHumanIdx) — no handoff ever needed
+    var humanCount = state.players.filter(function(p){return !p.isAI;}).length;
+    if (humanCount <= 1) { state.localHumanIdx = active.idx; next(); return; }
+
+    // Show handoff overlay
+    showHandoffOverlay(active, function() {
+      state.localHumanIdx = active.idx;
+      refreshGame();
+      next();
+    });
+  }
+
+  function showHandoffOverlay(player, onReady) {
+    var ov = document.getElementById('handoff-overlay');
+    if (!ov) { onReady(); return; }
+    document.getElementById('handoff-name').textContent = player.name;
+    var swatch = document.getElementById('handoff-swatch');
+    if (swatch) swatch.style.background = HL.Render.PLAYER_HEX[player.color].fill;
+    ov.classList.remove('hidden');
+    var btn = document.getElementById('handoff-ready');
+    btn.focus();
+    app.pendingAction = function() {
+      ov.classList.add('hidden');
+      app.pendingAction = null;
+      onReady();
+    };
   }
 
   function refreshGame() {
@@ -291,14 +412,15 @@
   // ===== Primary button behavior =====
   function onPrimary() {
     var state = app.game;
+    var localIdx = state.localHumanIdx || 0;
     if (state.phase === 'setup') {
       var setupP = HL.Game.currentSetupPlayer(state);
-      if (setupP.idx !== 0) return;
+      if (setupP.idx !== localIdx) return;
       if (state.setupExpecting === 'settlement') startHumanSetupSettlement();
       else startHumanSetupRoad();
     } else if (state.phase === 'play') {
       var cp = state.players[state.currentPlayerIdx];
-      if (cp.idx !== 0) return;
+      if (cp.idx !== localIdx || cp.isAI) return;
       if (state.turnState === 'roll') humanRoll();
       else doEndTurn();
     }
@@ -350,14 +472,14 @@
 
     if (state.phase === 'setup') {
       var setupP = HL.Game.currentSetupPlayer(state);
-      if (setupP.idx === 0) {
-        // Human's setup turn — wait for human action
-        HL.UI.updateHud(state);
-        if (state.setupExpecting === 'settlement') startHumanSetupSettlement();
-        else startHumanSetupRoad();
+      if (!setupP.isAI) {
+        ensureLocalIsCurrentHuman(state, function() {
+          HL.UI.updateHud(state);
+          if (state.setupExpecting === 'settlement') startHumanSetupSettlement();
+          else startHumanSetupRoad();
+        });
         return;
       }
-      // AI setup
       runAiSetupStep();
       return;
     }
@@ -368,27 +490,29 @@
       // Discard handling
       if (state.turnState === 'robber-discard') {
         var dc = state.discardCurrent;
-        if (dc && dc.idx === 0) {
-          HL.UI.populateDiscardScreen(state, state.players[0], dc.need);
-          HL.UI.go('discard');
+        if (dc && !state.players[dc.idx].isAI) {
+          ensureLocalIsCurrentHuman(state, function() {
+            HL.UI.populateDiscardScreen(state, state.players[dc.idx], dc.need);
+            HL.UI.go('discard');
+          });
           return;
         }
-        // Should not happen — AI discards resolved at roll
+        // AI discards already resolved at roll, but be defensive
         proceedAfterDiscard();
         return;
       }
 
       if (state.turnState === 'robber-move') {
-        if (state.robberMover === 0) {
-          startHumanRobberMove();
+        if (!state.players[state.robberMover].isAI) {
+          ensureLocalIsCurrentHuman(state, startHumanRobberMove);
         } else {
           runAiRobberMove();
         }
         return;
       }
       if (state.turnState === 'robber-steal') {
-        if (state.robberMover === 0) {
-          startHumanStealPick();
+        if (!state.players[state.robberMover].isAI) {
+          ensureLocalIsCurrentHuman(state, startHumanStealPick);
         } else {
           var tgt = HL.AI.pickStealTarget(state, state.robberMover, state.robberStealCandidates);
           HL.Game.stealCard(state, tgt);
@@ -398,7 +522,7 @@
         return;
       }
       if (state.turnState === 'pick-monopoly') {
-        if (cp.idx === 0) startHumanMonopolyPick();
+        if (!cp.isAI) ensureLocalIsCurrentHuman(state, startHumanMonopolyPick);
         else {
           var res = chooseAIMonopoly(state, cp);
           HL.Game.resolveMonopoly(state, res);
@@ -408,7 +532,7 @@
         return;
       }
       if (state.turnState === 'pick-plenty') {
-        if (cp.idx === 0) startHumanPlentyPick();
+        if (!cp.isAI) ensureLocalIsCurrentHuman(state, startHumanPlentyPick);
         else {
           var picks = chooseAIPlenty(state, cp);
           HL.Game.resolvePlenty(state, picks);
@@ -418,14 +542,14 @@
         return;
       }
       if (state.turnState === 'free-road') {
-        if (cp.idx === 0) startHumanFreeRoad();
+        if (!cp.isAI) ensureLocalIsCurrentHuman(state, startHumanFreeRoad);
         else runAiFreeRoad();
         return;
       }
 
-      if (cp.idx === 0) {
-        // Human main turn — just update HUD, wait
-        HL.UI.updateHud(state);
+      if (!cp.isAI) {
+        // Human main turn — handoff if needed, then wait
+        ensureLocalIsCurrentHuman(state, function() { HL.UI.updateHud(state); });
         return;
       }
       // AI turn
@@ -553,14 +677,25 @@
           var dr = HL.Game.playDev(state, 'knight');
           if (!dr.ok) { next(0); return; }
           refreshGame();
+          if (state.noRobber) {
+            // Chill mode — knight just counts, no robber move
+            next();
+            return;
+          }
           // Move robber
           setTimeout(function(){
             var tile = HL.AI.pickRobberTile(state, p.idx);
             HL.Game.moveRobber(state, tile);
+            HL.Sound.play('robber');
             refreshGame();
             if (state.turnState === 'robber-steal') {
               var tgt = HL.AI.pickStealTarget(state, p.idx, state.robberStealCandidates);
+              var victim = state.players[tgt];
               HL.Game.stealCard(state, tgt);
+              if (victim && !victim.isAI && victim.idx === (state.localHumanIdx || 0)) {
+                var b = HL.AI.barb('rob-you');
+                if (b) HL.UI.toast(p.name + ': "' + b + '"');
+              }
             }
             refreshGame();
             // After knight, re-evaluate actions if still our turn (handles both 'main' and 'roll' restore)
@@ -628,6 +763,12 @@
         return;
       case 'end-turn':
         if (state.phase === 'over') { next(0); return; }
+        // Occasional barb if AI is closing in on victory
+        var vp = HL.Game.totalVP(state, p);
+        if (vp >= state.winVP - 2 && Math.random() < 0.35) {
+          var b = HL.AI.barb('win-soon');
+          if (b) HL.UI.toast(p.name + ': "' + b + '"');
+        }
         HL.Game.endTurn(state);
         refreshGame();
         setTimeout(driveTurns, 500);
@@ -656,14 +797,21 @@
   // ===== AI: robber move =====
   function runAiRobberMove() {
     var state = app.game;
+    var mover = state.players[state.robberMover];
     var tile = HL.AI.pickRobberTile(state, state.robberMover);
     setTimeout(function() {
       HL.Game.moveRobber(state, tile);
+      HL.Sound.play('robber');
       refreshGame();
       if (state.turnState === 'robber-steal') {
         var tgt = HL.AI.pickStealTarget(state, state.robberMover, state.robberStealCandidates);
         setTimeout(function() {
+          var victim = state.players[tgt];
           HL.Game.stealCard(state, tgt);
+          if (victim && !victim.isAI && victim.idx === (state.localHumanIdx || 0)) {
+            var b = HL.AI.barb('rob-you');
+            if (b) HL.UI.toast(mover.name + ': "' + b + '"');
+          }
           refreshGame();
           setTimeout(driveTurns, 300);
         }, 300);
@@ -675,12 +823,13 @@
 
   // ===== Human: roll =====
   function humanRoll() {
+    HL.Sound.play('roll');
     HL.UI.rollDiceAnim();
     setTimeout(function() {
-      HL.Game.rollDice(app.game);
+      var r = HL.Game.rollDice(app.game);
       refreshGame();
-      // If we triggered the robber-discard for ourselves, drive will handle
-      // If we need to move robber, drive will switch to robber-move
+      if (r.robber) HL.Sound.play('robber');
+      else if (r.sum !== 7) HL.Sound.play('production');
       if (app.game.turnState !== 'main') {
         setTimeout(driveTurns, 400);
       }
@@ -691,7 +840,7 @@
   function enterBuildSettlementMode() {
     HL.UI.closePopover();
     var state = app.game;
-    var p = state.players[0];
+    var p = state.players[state.currentPlayerIdx];
     var legal = HL.Board.legalSettlementVertices(state.board, state.players, p);
     if (legal.length === 0) { HL.UI.toast('No legal spot', 'danger'); return; }
     HL.UI.startVertexPick(state, legal, {
@@ -699,6 +848,7 @@
       onConfirm: function(vid) {
         var r = HL.Game.buildSettlement(state, vid);
         if (!r.ok) HL.UI.toast(r.err, 'danger');
+        else HL.Sound.play('build-settle');
         refreshGame();
         checkWinAndDrive();
       }
@@ -708,7 +858,7 @@
   function enterBuildCityMode() {
     HL.UI.closePopover();
     var state = app.game;
-    var p = state.players[0];
+    var p = state.players[state.currentPlayerIdx];
     var legal = HL.Board.legalCityVertices(state.board, p);
     if (legal.length === 0) { HL.UI.toast('No settlement to upgrade', 'danger'); return; }
     HL.UI.startVertexPick(state, legal, {
@@ -716,6 +866,7 @@
       onConfirm: function(vid) {
         var r = HL.Game.buildCity(state, vid);
         if (!r.ok) HL.UI.toast(r.err, 'danger');
+        else HL.Sound.play('build-city');
         refreshGame();
         checkWinAndDrive();
       }
@@ -725,13 +876,14 @@
   function enterBuildRoadMode() {
     HL.UI.closePopover();
     var state = app.game;
-    var legal = HL.Board.legalRoadEdges(state.board, state.players, 0);
+    var legal = HL.Board.legalRoadEdges(state.board, state.players, state.currentPlayerIdx);
     if (legal.length === 0) { HL.UI.toast('No legal road spot', 'danger'); return; }
     HL.UI.startEdgePick(state, legal, {
       label: 'Build road (-1 wood, -1 brick)',
       onConfirm: function(eid) {
         var r = HL.Game.buildRoad(state, eid);
         if (!r.ok) HL.UI.toast(r.err, 'danger');
+        else HL.Sound.play('build-road');
         refreshGame();
         checkWinAndDrive();
       }
@@ -740,7 +892,7 @@
 
   function startHumanFreeRoad() {
     var state = app.game;
-    var legal = HL.Board.legalRoadEdges(state.board, state.players, 0);
+    var legal = HL.Board.legalRoadEdges(state.board, state.players, state.currentPlayerIdx);
     if (legal.length === 0 || state.freeRoadsLeft <= 0) {
       state.turnState = 'main';
       state.freeRoadsLeft = 0;
@@ -788,7 +940,7 @@
     HL.UI.closePopover();
     var r = HL.Game.buyDev(app.game);
     if (!r.ok) HL.UI.toast(r.err, 'danger');
-    else HL.UI.toast('Bought: ' + r.card);
+    else { HL.UI.toast('Bought: ' + r.card); HL.Sound.play('buy-dev'); }
     refreshGame();
     checkWinAndDrive();
   }
@@ -921,7 +1073,7 @@
   function ptInc(side, res) {
     var state = app.game;
     var pt = state._playerTrade;
-    var p = state.players[0];
+    var p = state.players[state.currentPlayerIdx];
     var max;
     if (side === 'give') {
       max = p.hand[res] - pt.give[res];
@@ -945,21 +1097,26 @@
   function proposePlayerTrade() {
     var state = app.game;
     var pt = state._playerTrade;
-    // Evaluate from each AI's perspective
+    // Evaluate from each AI's perspective. Other humans implicit accept (tap to confirm).
     var responses = [];
     state.players.forEach(function(p) {
-      if (p.idx === 0) return;
-      var accept = HL.AI.evaluateTrade(state, p.idx, pt.give, pt.recv);
-      responses.push({ idx: p.idx, accept: accept, reason: accept ? null : 'Not worth it' });
+      if (p.idx === state.currentPlayerIdx) return;
+      if (!p.isAI) {
+        responses.push({ idx: p.idx, accept: true, reason: 'Human — tap to confirm' });
+      } else {
+        var accept = HL.AI.evaluateTrade(state, p.idx, pt.give, pt.recv);
+        responses.push({ idx: p.idx, accept: accept, reason: accept ? null : 'Not worth it' });
+      }
     });
     HL.UI.showTradeResponses(state, responses);
   }
   function acceptTradeWith(idx) {
     var state = app.game;
     var pt = state._playerTrade;
-    var r = HL.Game.executePlayerTrade(state, 0, idx, pt.give, pt.recv);
+    var r = HL.Game.executePlayerTrade(state, state.currentPlayerIdx, idx, pt.give, pt.recv);
     if (!r.ok) { HL.UI.toast(r.err, 'danger'); return; }
     HL.UI.toast('Trade done');
+    HL.Sound.play('trade');
     HL.UI.back();
     refreshGame();
   }
@@ -968,6 +1125,7 @@
   function discardPick(res) {
     var state = app.game;
     var sel = state._discardSelected;
+    if (!state.discardCurrent) return;
     var p = state.players[state.discardCurrent.idx];
     var need = state.discardCurrent.need;
     var total = sel.wood + sel.brick + sel.sheep + sel.wheat + sel.ore;
@@ -997,9 +1155,12 @@
     var state = app.game;
     if (state.discardQueue.length > 0) {
       state.discardCurrent = state.discardQueue.shift();
-      // If still human (shouldn't happen since only one human), reuse screen
-      if (state.discardCurrent.idx === 0) {
-        HL.UI.populateDiscardScreen(state, state.players[0], state.discardCurrent.need);
+      var next = state.players[state.discardCurrent.idx];
+      // If still human, route through driveTurns so handoff kicks in for other humans
+      if (!next.isAI) {
+        HL.UI.go('game', { history: false });
+        refreshGame();
+        setTimeout(driveTurns, 100);
         return;
       }
     }
@@ -1014,13 +1175,14 @@
   function startHumanRobberMove() {
     var state = app.game;
     var candidates = state.board.tiles
-      .filter(function(t){ return t.id !== state.board.robberTileId; })
+      .filter(function(t){ return t.id !== state.board.robberTileId && t.res !== 'sea'; })
       .map(function(t){ return t.id; });
     HL.UI.startTilePick(state, candidates, {
       label: 'Move the robber',
       mandatory: true,
       onConfirm: function(tid) {
         var res = HL.Game.moveRobber(state, tid);
+        HL.Sound.play('robber');
         refreshGame();
         if (state.turnState === 'robber-steal') {
           startHumanStealPick();
@@ -1079,10 +1241,12 @@
   function checkWinAndDrive() {
     var state = app.game;
     if (state.phase === 'over') {
+      var winner = state.players[state.winnerIdx];
+      HL.Sound.play(winner && !winner.isAI ? 'win' : 'lose');
       setTimeout(driveTurns, 300);
       return;
     }
-    if (state.players[state.currentPlayerIdx].idx !== 0) {
+    if (state.players[state.currentPlayerIdx].isAI) {
       setTimeout(driveTurns, 300);
     }
   }

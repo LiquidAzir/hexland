@@ -385,9 +385,9 @@ window.HL = window.HL || {};
     if (p.aiStyle === 'trader') threshold = 0.9;
     if (p.aiStyle === 'aggressive') threshold = 1.15;
 
-    // Don't help the leader
-    var human = state.players[0];
-    if (HL.Game.totalVP(state, human) >= 8) threshold *= 1.4;
+    // Don't help the proposer if they're close to winning
+    var proposer = state.players[state.currentPlayerIdx];
+    if (HL.Game.totalVP(state, proposer) >= (state.winVP - 2)) threshold *= 1.4;
 
     return valueIn >= valueOut * threshold;
   }
@@ -408,6 +408,39 @@ window.HL = window.HL || {};
     return base * (1 + need * 0.1);
   }
 
+  // ====== Named AI personalities ======
+  // Distinct flavour names + barbs. Shuffle picks across all 3 pools so any name set is varied.
+  var AI_NAMES = [
+    'Bran the Bold', 'Korr Ironfoot', 'Vex Stormrunner',
+    'Aris Quill', 'Hilda Stonefoot', 'Master Eda',
+    'Marcellus Coin', 'Old Dunmar', 'Coppin Quirk',
+    'Selka the Quiet', 'Rurik', 'Yara of the Marsh',
+    'Tovin', 'Mara', 'Riku'
+  ];
+
+  var BARBS = {
+    'rob-you':       ['Sorry, friend.', 'Nothing personal.', 'A gift, please.', 'I needed that.', 'Tax collected.'],
+    'rob-them':      ['That hurts.', 'Ouch.', 'Bandits everywhere.', 'Bad spot for me.', 'A loss for the realm.'],
+    'longest':       ['The road is mine.', 'My highway stretches on.', 'Try and catch up.', 'Roads to riches.'],
+    'army':          ['The blade decides.', 'My knights serve.', 'I command the field.', 'Steel speaks.'],
+    'win-soon':      ['Almost there...', 'I taste victory.', 'Two more points.', 'The end is near.'],
+    'trade-reject':  ['Not today.', 'My hand is full.', 'A poor deal.', 'Try someone else.', 'Pass.'],
+    'trade-accept':  ['A fine deal.', 'Pleasure doing business.', 'Done and done.', 'Agreed.'],
+    'block-road':    ['You shall not pass.', 'My settlement stands.', 'Detour, traveller.']
+  };
+
+  function pickAINames(count, rng) {
+    var pool = AI_NAMES.slice();
+    HL.Board.shuffle(pool, rng);
+    return pool.slice(0, count);
+  }
+
+  function barb(event) {
+    var pool = BARBS[event];
+    if (!pool || !pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
   HL.AI = {
     pickInitialSettlement: pickInitialSettlement,
     pickInitialRoad: pickInitialRoad,
@@ -415,7 +448,9 @@ window.HL = window.HL || {};
     pickRobberTile: pickRobberTile,
     pickStealTarget: pickStealTarget,
     evaluateTrade: evaluateTrade,
-    scoreVertex: scoreVertex
+    scoreVertex: scoreVertex,
+    pickAINames: pickAINames,
+    barb: barb
   };
 
 })(window.HL);
