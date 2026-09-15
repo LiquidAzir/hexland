@@ -25,10 +25,23 @@
   };
 
   var STORAGE_KEY = 'hexland_save_v1';
+  var tasks=[], clock=0, lastFrame=0, rolling=false,tradeConsent=null;
+  function later(fn,ms){tasks.push({at:clock+(ms||0),fn:fn,game:app.game});}
+  function advance(ms){
+    if(!['game','discard'].includes(HL.UI.currentScreen()))return;
+    var end=clock+Math.max(0,Math.min(Number(ms)||0,60000)),steps=0;
+    while(steps++<200){tasks.sort(function(a,b){return a.at-b.at});var t=tasks[0];if(!t||t.at>end)break;tasks.shift();clock=t.at;if(t.game===app.game)t.fn();if(!['game','discard'].includes(HL.UI.currentScreen()))break;}
+    clock=end;
+  }
+  function frame(now){var dt=lastFrame?Math.min(now-lastFrame,100):0;lastFrame=now;advance(dt);requestAnimationFrame(frame);}
+  function clearTasks(){tradeConsent=null;document.getElementById('trade-consent').classList.add('hidden');tasks=[];rolling=false;app.pendingAction=null;document.querySelectorAll('.die.rolling').forEach(function(d){d.classList.remove('rolling');});document.getElementById('handoff-overlay').classList.add('hidden');HL.UI.resetInteraction();}
+  function pauseGame(){if(!app.game)return;saveGame();HL.UI.resetInteraction();HL.UI.go('pause',{history:false});}
+  function resumeGame(){HL.UI.go('game',{history:false});refreshGame();if(!tasks.length)later(driveTurns,80);}
 
   // ===== Boot =====
   function init() {
     HL.UI.init();
+    HL.Art.menu();
     // Restore sound preference
     try {
       var s = localStorage.getItem('hexland_setup_sound');
@@ -41,25 +54,15 @@
     loadSaved();
     refreshMenuButtons();
     HL.UI.go('menu', { history: false });
+    requestAnimationFrame(frame);
+    window.advanceTime=function(ms){advance(ms);return HL.Art.ready();};
+    window.render_game_to_text=function(){var s=app.game,p=s&&s.players[s.localHumanIdx||0];return JSON.stringify({screen:HL.UI.currentScreen(),coordinates:'board SVG: origin center; +x right, +y down',phase:s&&s.phase,turnState:s&&s.turnState,currentPlayer:s&&s.currentPlayerIdx,localPlayer:s&&s.localHumanIdx,setup:s&&{index:s.setupIndex,expecting:s.setupExpecting,player:s.setupOrder[s.setupIndex]},hand:p&&p.hand,bank:s&&s.bank,dice:s&&s.lastDice,players:s&&s.players.map(function(p){return{name:p.name,isAI:p.isAI,vp:HL.Game.visibleVP(s,p),cards:HL.Game.totalCards(p.hand),settlements:Object.keys(p.settlements),cities:Object.keys(p.cities),roads:Object.keys(p.roads)}}),cursor:HL.UI.cursorSnapshot(),popover:HL.UI.popoverId(),focus:document.activeElement&&{id:document.activeElement.id,action:document.activeElement.dataset.action},robber:s&&s.board.robberTileId,freeRoads:s&&s.freeRoadsLeft,rolling:rolling,pendingTasks:tasks.length,render:HL.Art.stats()});};
+    if(['127.0.0.1','localhost','[::1]'].includes(location.hostname)&&new URLSearchParams(location.search).has('test'))window.__hexland={snapshot:function(){return JSON.parse(JSON.stringify(app.game));},load:function(raw){clearTasks();app.savedGame=HL.Game.restore(raw);continueGame();},newGame:function(opts){clearTasks();app.game=HL.Game.newGame(opts);HL.UI.go('game',{history:false});refreshGame();later(driveTurns,1);},drive:function(){driveTurns();}};
   }
 
   // ===== Responsive scaling (phone/desktop, transparent on glasses) =====
   function setupResponsiveScaling() {
-    var app = document.getElementById('app');
-    function applyScale() {
-      var vw = window.innerWidth;
-      var vh = window.innerHeight;
-      // On exactly 600x600 (glasses) — no scale needed
-      var scale = Math.min(vw / 600, vh / 600);
-      if (Math.abs(scale - 1) < 0.01) {
-        app.style.transform = '';
-      } else {
-        app.style.transform = 'scale(' + scale + ')';
-      }
-    }
-    applyScale();
-    window.addEventListener('resize', applyScale);
-    window.addEventListener('orientationchange', applyScale);
+    document.getElementById('app').style.transform='';
   }
 
   // ===== Board click/tap handlers (tap-to-place) =====
@@ -88,30 +91,21 @@
       return ok;
     }
 
-    // pointerdown fires reliably on touch + mouse + pen
-    svg.addEventListener('pointerdown', function(e) {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      if (tryConfirm(e.target)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    });
-    // click as a fallback (in case pointer events are stopped by something else)
     svg.addEventListener('click', function(e) {
-      tryConfirm(e.target);
+      if(tryConfirm(e.target)){e.preventDefault();e.stopPropagation();}
     });
   }
 
   function loadSaved() {
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) app.savedGame = JSON.parse(raw);
+      if (raw) app.savedGame = HL.Game.restore(JSON.parse(raw));
     } catch (e) {}
   }
 
   function saveGame() {
     if (!app.game || app.game.phase === 'over') {
-      localStorage.removeItem(STORAGE_KEY);
+      try{localStorage.removeItem(STORAGE_KEY);}catch(e){}
       app.savedGame = null;
       return;
     }
@@ -162,25 +156,31 @@
         case 'ArrowLeft':  handleArrow('left'); e.preventDefault(); break;
         case 'ArrowRight': handleArrow('right'); e.preventDefault(); break;
         case 'Enter':
-          if (HL.UI.isCursorActive()) { HL.UI.confirmCursor(); afterCursorConfirm(); e.preventDefault(); break; }
+          if (inInput){document.querySelector('[data-action=start-game]').focus();e.preventDefault();break;}
           if (document.activeElement && document.activeElement.classList.contains('focusable')) {
             document.activeElement.click();
           }
           e.preventDefault();
           break;
         case 'Escape':
-          if (HL.UI.isCursorActive()) { HL.UI.cancelCursor(); }
+          if(tradeConsent){finishTradeConsent(false);}
+          else if(HL.UI.currentScreen()==='pause'){resumeGame();}
+          else if (HL.UI.isCursorActive()) { if(HL.UI.cursorSnapshot().mandatory)pauseGame();else HL.UI.cancelCursor(); }
           else if (HL.UI.isPopoverOpen()) { HL.UI.closePopover(); }
+          else if(HL.UI.currentScreen()==='game'||HL.UI.currentScreen()==='discard'){pauseGame();}
           else HL.UI.back();
           e.preventDefault();
           break;
+        case 'Tab': HL.UI.tabFocus(e.shiftKey);e.preventDefault();break;
+        case 'f': if(!document.fullscreenElement)document.getElementById('app').requestFullscreen?.();else document.exitFullscreen?.();break;
       }
     });
   }
 
   function handleArrow(dir) {
-    if (HL.UI.isCursorActive() && app.game) {
-      HL.UI.moveCursor(app.game, dir);
+    if(app.pendingAction){document.getElementById('handoff-ready').focus();return;}
+    if (HL.UI.isCursorActive() && app.game && document.activeElement.id==='board-control') {
+      if(!HL.UI.moveCursor(app.game, dir))document.getElementById('btn-pause').focus();
     } else {
       HL.UI.moveFocus(dir);
     }
@@ -192,9 +192,15 @@
       // Menu
       case 'new-game':       startNewGameFlow(); break;
       case 'continue-game':  continueGame(); break;
+      case 'consent-accept':finishTradeConsent(true);break;
+      case 'consent-decline':finishTradeConsent(false);break;
+      case 'pause': pauseGame();break;
+      case 'resume-game': resumeGame();break;
+      case 'save-exit': saveGame();HL.UI.go('menu',{history:false});refreshMenuButtons();break;
+      case 'confirm-location':if(HL.UI.isCursorActive()){HL.UI.confirmCursor();afterCursorConfirm();}else onPrimary();break;
       case 'how-to-play':    HL.UI.closePopover(true); HL.UI.go('how-to-play'); break;
       case 'back':           HL.UI.back(); break;
-      case 'go-menu':        HL.UI.go('menu', { history: false }); break;
+      case 'go-menu':        clearTasks();HL.UI.go('menu', { history: false });refreshMenuButtons(); break;
 
       // Setup screen
       case 'start-game':     beginGame(); break;
@@ -305,7 +311,9 @@
 
   function continueGame() {
     if (!app.savedGame) return;
-    var saved = app.savedGame;
+    clearTasks();
+    var saved = HL.Game.restore(app.savedGame);
+    if(!saved){app.savedGame=null;refreshMenuButtons();HL.UI.toast('This save could not be read');return;}
     saved.rng = HL.Board.mulberry32(((saved.seed || 1) ^ Date.now()) >>> 0);
     // Rebuild lookups so the same JS objects are shared between arrays and dicts
     // (JSON round-trip splits them into separate copies otherwise)
@@ -318,10 +326,11 @@
     app.game = saved;
     HL.UI.go('game', { history: false });
     refreshGame();
-    setTimeout(driveTurns, 200);
+    later(driveTurns, 200);
   }
 
   function beginGame() {
+    clearTasks();
     var nameInput = document.getElementById('player-name-input');
     if (nameInput) app.setup.playerName = (nameInput.value || 'You').slice(0, 12);
 
@@ -341,7 +350,7 @@
 
     HL.UI.go('game', { history: false });
     refreshGame();
-    setTimeout(driveTurns, 250);
+    later(driveTurns, 250);
   }
 
   // Build humans list. Player 1 always = the user's name+color from Setup.
@@ -436,7 +445,7 @@
       onConfirm: function(vid) {
         HL.Game.placeInitialSettlement(app.game, vid);
         refreshGame();
-        setTimeout(startHumanSetupRoad, 150);
+        later(startHumanSetupRoad, 150);
       }
     });
   }
@@ -453,7 +462,7 @@
       onConfirm: function(eid) {
         HL.Game.placeInitialRoad(app.game, eid);
         refreshGame();
-        setTimeout(driveTurns, 300);
+        later(driveTurns, 300);
       }
     });
   }
@@ -461,7 +470,8 @@
   // ===== Drive AI / setup AI / next phase =====
   function driveTurns() {
     var state = app.game;
-    if (!state) return;
+    if (!state||!['game','discard'].includes(HL.UI.currentScreen())||app.pendingAction) return;
+    HL.Game.checkWin(state);
 
     if (state.phase === 'over') {
       HL.UI.showGameOver(state);
@@ -517,7 +527,7 @@
           var tgt = HL.AI.pickStealTarget(state, state.robberMover, state.robberStealCandidates);
           HL.Game.stealCard(state, tgt);
           refreshGame();
-          setTimeout(driveTurns, 350);
+          later(driveTurns, 350);
         }
         return;
       }
@@ -527,7 +537,7 @@
           var res = chooseAIMonopoly(state, cp);
           HL.Game.resolveMonopoly(state, res);
           refreshGame();
-          setTimeout(driveTurns, 350);
+          later(driveTurns, 350);
         }
         return;
       }
@@ -537,7 +547,7 @@
           var picks = chooseAIPlenty(state, cp);
           HL.Game.resolvePlenty(state, picks);
           refreshGame();
-          setTimeout(driveTurns, 350);
+          later(driveTurns, 350);
         }
         return;
       }
@@ -569,20 +579,8 @@
     Object.keys(totals).forEach(function(r){ if (totals[r] > bestN) { bestN = totals[r]; best = r; } });
     return best || 'wheat';
   }
-  function chooseAIPlenty(state, p) {
-    var picks = [];
-    for (var i = 0; i < 2; i++) {
-      var sim = Object.assign({}, p.hand);
-      picks.forEach(function(r){ sim[r]++; });
-      var need = null;
-      var goals = [HL.Game.COSTS.city, HL.Game.COSTS.settlement, HL.Game.COSTS.dev, HL.Game.COSTS.road];
-      for (var g = 0; g < goals.length && !need; g++) {
-        for (var k in goals[g]) if (sim[k] < goals[g][k]) { need = k; break; }
-      }
-      picks.push(need || 'wheat');
-    }
-    return picks;
-  }
+  function chooseAIPlenty(state,p){return HL.AI.chooseBestResources(state,p,2);}
+
   // Replace bad `require` calls above
   function fixDriveTurnsHelpers() {}
 
@@ -590,18 +588,21 @@
   function runAiSetupStep() {
     var state = app.game;
     var setupP = HL.Game.currentSetupPlayer(state);
-    setTimeout(function() {
+    if(state.setupExpecting==='road'){
+      later(function(){var eid=HL.AI.pickInitialRoad(state,setupP.idx)||HL.Game.legalInitialRoad(state)[0];if(eid)HL.Game.placeInitialRoad(state,eid);refreshGame();later(driveTurns,250);},250);return;
+    }
+    later(function() {
       // Settlement
       var vid = HL.AI.pickInitialSettlement(state, setupP.idx);
       if (!vid) {
         forceSetupAdvance(state);
         refreshGame();
-        setTimeout(driveTurns, 200);
+        later(driveTurns, 200);
         return;
       }
       HL.Game.placeInitialSettlement(state, vid);
       refreshGame();
-      setTimeout(function() {
+      later(function() {
         // Road
         var eid = HL.AI.pickInitialRoad(state, setupP.idx);
         if (!eid) {
@@ -621,7 +622,7 @@
           forceSetupAdvance(state);
         }
         refreshGame();
-        setTimeout(driveTurns, 300);
+        later(driveTurns, 300);
       }, 350);
     }, 300);
   }
@@ -655,20 +656,20 @@
 
     function next(delay) {
       refreshGame();
-      setTimeout(function(){ runAiActions(actions, i + 1); }, delay || 400);
+      later(function(){ runAiActions(actions, i + 1); }, delay || 400);
     }
 
     switch (a.type) {
       case 'roll':
         HL.UI.rollDiceAnim();
-        setTimeout(function() {
+        later(function() {
           HL.Game.rollDice(state);
           refreshGame();
           if (state.turnState !== 'main') {
             // Handle robber etc — re-enter drive
-            setTimeout(driveTurns, 400);
+            later(driveTurns, 400);
           } else {
-            setTimeout(function(){ runAiActions(actions.slice(1), 0); }, 400);
+            later(function(){ runAiActions(actions.slice(1), 0); }, 400);
           }
         }, 500);
         return;
@@ -683,7 +684,7 @@
             return;
           }
           // Move robber
-          setTimeout(function(){
+          later(function(){
             var tile = HL.AI.pickRobberTile(state, p.idx);
             HL.Game.moveRobber(state, tile);
             HL.Sound.play('robber');
@@ -703,27 +704,27 @@
                 state.players[state.currentPlayerIdx].idx === p.idx &&
                 (state.turnState === 'main' || state.turnState === 'roll')) {
               var more = HL.AI.takeTurn(state, p.idx);
-              setTimeout(function(){ runAiActions(more, 0); }, 400);
+              later(function(){ runAiActions(more, 0); }, 400);
             } else {
-              setTimeout(driveTurns, 400);
+              later(driveTurns, 400);
             }
           }, 400);
           return;
         } else if (a.kind === 'mono') {
-          HL.Game.playDev(state, 'mono');
+          if(!HL.Game.playDev(state, 'mono').ok){next();return;}
           HL.Game.resolveMonopoly(state, a.res);
           next();
           return;
         } else if (a.kind === 'plenty') {
-          HL.Game.playDev(state, 'plenty');
+          if(!HL.Game.playDev(state, 'plenty').ok){next();return;}
           HL.Game.resolvePlenty(state, a.picks);
           next();
           return;
         } else if (a.kind === 'road') {
-          HL.Game.playDev(state, 'road');
+          if(!HL.Game.playDev(state, 'road').ok){next();return;}
           refreshGame();
           // Place two free roads
-          setTimeout(function(){
+          later(function(){
             for (var r = 0; r < 2; r++) {
               var legal = HL.Board.legalRoadEdges(state.board, state.players, p.idx);
               if (legal.length === 0) { state.freeRoadsLeft = 0; break; }
@@ -735,7 +736,7 @@
             state.turnState = 'main';
             refreshGame();
             var more = HL.AI.takeTurn(state, p.idx);
-            setTimeout(function(){ runAiActions(more, 0); }, 350);
+            later(function(){ runAiActions(more, 0); }, 350);
           }, 300);
           return;
         }
@@ -771,7 +772,7 @@
         }
         HL.Game.endTurn(state);
         refreshGame();
-        setTimeout(driveTurns, 500);
+        later(driveTurns, 500);
         return;
     }
     next();
@@ -799,13 +800,13 @@
     var state = app.game;
     var mover = state.players[state.robberMover];
     var tile = HL.AI.pickRobberTile(state, state.robberMover);
-    setTimeout(function() {
+    later(function() {
       HL.Game.moveRobber(state, tile);
       HL.Sound.play('robber');
       refreshGame();
       if (state.turnState === 'robber-steal') {
         var tgt = HL.AI.pickStealTarget(state, state.robberMover, state.robberStealCandidates);
-        setTimeout(function() {
+        later(function() {
           var victim = state.players[tgt];
           HL.Game.stealCard(state, tgt);
           if (victim && !victim.isAI && victim.idx === (state.localHumanIdx || 0)) {
@@ -813,25 +814,28 @@
             if (b) HL.UI.toast(mover.name + ': "' + b + '"');
           }
           refreshGame();
-          setTimeout(driveTurns, 300);
+          later(driveTurns, 300);
         }, 300);
       } else {
-        setTimeout(driveTurns, 300);
+        later(driveTurns, 300);
       }
     }, 300);
   }
 
   // ===== Human: roll =====
   function humanRoll() {
+    if(rolling||app.game.turnState!=='roll')return;
+    rolling=true;document.getElementById('btn-primary').disabled=true;
     HL.Sound.play('roll');
     HL.UI.rollDiceAnim();
-    setTimeout(function() {
+    later(function() {
       var r = HL.Game.rollDice(app.game);
+      rolling=false;
       refreshGame();
       if (r.robber) HL.Sound.play('robber');
       else if (r.sum !== 7) HL.Sound.play('production');
       if (app.game.turnState !== 'main') {
-        setTimeout(driveTurns, 400);
+        later(driveTurns, 400);
       }
     }, 500);
   }
@@ -893,8 +897,8 @@
   function startHumanFreeRoad() {
     var state = app.game;
     var legal = HL.Board.legalRoadEdges(state.board, state.players, state.currentPlayerIdx);
-    if (legal.length === 0 || state.freeRoadsLeft <= 0) {
-      state.turnState = 'main';
+    if (legal.length === 0 || state.freeRoadsLeft <= 0 || Object.keys(state.players[state.currentPlayerIdx].roads).length>=HL.Game.LIMITS.roads) {
+      state.turnState = state._postDevState||'main';state._postDevState=null;
       state.freeRoadsLeft = 0;
       refreshGame();
       return;
@@ -905,10 +909,11 @@
       onConfirm: function(eid) {
         HL.Game.buildRoad(state, eid, true);
         state.freeRoadsLeft--;
-        if (state.freeRoadsLeft <= 0) state.turnState = 'main';
+        if (state.freeRoadsLeft <= 0){state.turnState = state._postDevState||'main';state._postDevState=null;}
         refreshGame();
+        if(state.phase==='over'){checkWinAndDrive();return;}
         if (state.freeRoadsLeft > 0 && state.turnState === 'free-road') {
-          setTimeout(startHumanFreeRoad, 200);
+          later(startHumanFreeRoad, 200);
         }
       }
     });
@@ -927,7 +932,7 @@
     }
     state.turnState = 'main';
     refreshGame();
-    setTimeout(driveTurns, 350);
+    later(driveTurns, 350);
   }
 
   // ===== Dev cards =====
@@ -1004,12 +1009,14 @@
   }
 
   function startHumanPlentyPick() {
-    app.game._plentyPicked = [];
+    app.game._plentyPicked = app.game._plentyPicked||[];
     showPlentyMenu();
   }
   function showPlentyMenu() {
     var menu = document.getElementById('action-menu');
     var picks = app.game._plentyPicked;
+    var need=Math.min(2,HL.Game.totalCards(app.game.bank));
+    if(picks.length>=need){finishPlenty();return;}
     menu.querySelector('.popover-title').textContent = 'Year of Plenty — pick ' + (picks.length === 0 ? 'first' : 'second');
     var list = menu.querySelector('.popover-list');
     list.innerHTML = '';
@@ -1018,20 +1025,26 @@
       b.className = 'pop-item focusable';
       b.setAttribute('data-action', 'pick-plenty');
       b.setAttribute('data-res', res);
-      b.disabled = app.game.bank[res] <= 0;
+      b.disabled = app.game.bank[res] <= picks.filter(function(r){return r===res;}).length;
       b.innerHTML = '<span class="cost-row"><span class="ci res-' + res + '"></span></span><span class="pop-label">' + res + ' <span class="text-muted" style="font-size:11px">(bank: ' + app.game.bank[res] + ')</span></span>';
       list.appendChild(b);
     });
     HL.UI.openPopover('action-menu', { mandatory: true });
   }
   function doResolvePlenty(res) {
+    if(app.game.bank[res]<=app.game._plentyPicked.filter(function(r){return r===res;}).length)return;
     app.game._plentyPicked.push(res);
-    if (app.game._plentyPicked.length < 2) {
+    saveGame();
+    if (app.game._plentyPicked.length < Math.min(2,HL.Game.totalCards(app.game.bank))) {
       showPlentyMenu();
       return;
     }
+    finishPlenty();
+  }
+  function finishPlenty(){
     HL.UI.closePopover(true);
-    HL.Game.resolvePlenty(app.game, app.game._plentyPicked);
+    var result=HL.Game.resolvePlenty(app.game, app.game._plentyPicked);
+    if(!result.ok){app.game._plentyPicked=[];showPlentyMenu();return;}
     refreshGame();
     restoreActionMenu();
     checkWinAndDrive();
@@ -1113,7 +1126,18 @@
   function acceptTradeWith(idx) {
     var state = app.game;
     var pt = state._playerTrade;
-    var r = HL.Game.executePlayerTrade(state, state.currentPlayerIdx, idx, pt.give, pt.recv);
+    if(!state.players[idx].isAI){
+      tradeConsent={state:state,from:state.currentPlayerIdx,to:idx,give:Object.assign({},pt.give),recv:Object.assign({},pt.recv)};
+      document.getElementById('trade-consent-title').textContent=state.players[idx].name+' — your choice';
+      function list(m){return Object.keys(m).filter(function(r){return m[r]>0;}).map(function(r){return m[r]+' '+r;}).join(', ');}
+      document.getElementById('trade-consent-detail').textContent='Give '+list(pt.recv)+' to '+state.players[state.currentPlayerIdx].name+'. Receive '+list(pt.give)+'.';
+      document.getElementById('trade-consent').classList.remove('hidden');document.querySelector('[data-action=consent-accept]').focus();return;
+    }
+    executeTrade(state,state.currentPlayerIdx,idx,pt.give,pt.recv);
+  }
+  function finishTradeConsent(accepted){var t=tradeConsent;tradeConsent=null;document.getElementById('trade-consent').classList.add('hidden');if(t&&accepted&&t.state===app.game)executeTrade(t.state,t.from,t.to,t.give,t.recv);else document.getElementById('btn-propose-trade').focus();}
+  function executeTrade(state,from,idx,give,recv){
+    var r = HL.Game.executePlayerTrade(state, from, idx, give, recv);
     if (!r.ok) { HL.UI.toast(r.err, 'danger'); return; }
     HL.UI.toast('Trade done');
     HL.Sound.play('trade');
@@ -1129,26 +1153,27 @@
     var p = state.players[state.discardCurrent.idx];
     var need = state.discardCurrent.need;
     var total = sel.wood + sel.brick + sel.sheep + sel.wheat + sel.ore;
-    if (sel[res] > 0) {
-      // Already has selections of this resource — decrement (toggle/cycle)
-      sel[res]--;
-    } else if (sel[res] < p.hand[res] && total < need) {
-      // Increment from zero
+    if (sel[res] < p.hand[res] && total < need) {
       sel[res]++;
-    } else if (total >= need) {
-      HL.UI.toast('Deselect another first', 'danger');
+    } else if(sel[res]>0){
+      sel[res]=0;
+    } else {
+      HL.UI.toast('Tap a selected resource to clear it', 'danger');
     }
     HL.UI.refreshDiscardScreen(state, p, need);
+    saveGame();
   }
   function confirmDiscard() {
     var state = app.game;
     var sel = state._discardSelected;
     var p = state.players[state.discardCurrent.idx];
+    if(HL.Game.totalCards(sel)!==state.discardCurrent.need||Object.keys(sel).some(function(r){return sel[r]<0||sel[r]>p.hand[r];}))return;
     Object.keys(sel).forEach(function(res){
       p.hand[res] -= sel[res];
       state.bank[res] += sel[res];
     });
     HL.Game.pushEvent(state, p.name + ' discarded ' + (sel.wood+sel.brick+sel.sheep+sel.wheat+sel.ore));
+    delete state._discardSelected;
     proceedAfterDiscard();
   }
   function proceedAfterDiscard() {
@@ -1160,7 +1185,7 @@
       if (!next.isAI) {
         HL.UI.go('game', { history: false });
         refreshGame();
-        setTimeout(driveTurns, 100);
+        later(driveTurns, 100);
         return;
       }
     }
@@ -1168,7 +1193,7 @@
     state.turnState = 'robber-move';
     HL.UI.go('game', { history: false });
     refreshGame();
-    setTimeout(driveTurns, 200);
+    later(driveTurns, 200);
   }
 
   // ===== Human: robber move =====
@@ -1211,7 +1236,7 @@
       b.className = 'pop-item focusable';
       b.setAttribute('data-action', 'steal-pick');
       b.setAttribute('data-with', idx);
-      b.innerHTML = '<span class="cost-row"><span style="display:inline-block;width:14px;height:14px;background:' + HL.Render.PLAYER_HEX[p.color].fill + ';border-radius:50%"></span></span><span class="pop-label">' + p.name + ' (' + HL.Game.totalCards(p.hand) + ' cards)</span>';
+      b.innerHTML = '<span class="cost-row"><span style="display:inline-block;width:14px;height:14px;background:' + HL.Render.PLAYER_HEX[p.color].fill + ';border-radius:50%"></span></span><span class="pop-label">' + HL.UI.esc(p.name) + ' (' + HL.Game.totalCards(p.hand) + ' cards)</span>';
       list.appendChild(b);
     });
     HL.UI.openPopover('action-menu', { mandatory: true });
@@ -1235,7 +1260,7 @@
     }
     HL.Game.endTurn(state);
     refreshGame();
-    setTimeout(driveTurns, 250);
+    later(driveTurns, 250);
   }
 
   function checkWinAndDrive() {
@@ -1243,11 +1268,11 @@
     if (state.phase === 'over') {
       var winner = state.players[state.winnerIdx];
       HL.Sound.play(winner && !winner.isAI ? 'win' : 'lose');
-      setTimeout(driveTurns, 300);
+      later(driveTurns, 300);
       return;
     }
     if (state.players[state.currentPlayerIdx].isAI) {
-      setTimeout(driveTurns, 300);
+      later(driveTurns, 300);
     }
   }
 
@@ -1263,6 +1288,8 @@
 
   // Open action menu
   function openActionMenu() {
+    if(!app.game||app.game.phase!=='play'||app.game.players[app.game.currentPlayerIdx].isAI||!['main','roll'].includes(app.game.turnState))return;
+    restoreActionMenu();
     HL.UI.populateActionMenu(app.game);
     HL.UI.openPopover('action-menu');
   }

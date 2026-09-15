@@ -199,6 +199,7 @@ window.HL = window.HL || {};
   }
 
   function placeInitialSettlement(state, vertexId) {
+    if(state.phase!=='setup'||state.setupExpecting!=='settlement'||legalInitialSettlement(state).indexOf(vertexId)===-1)return false;
     var p = currentSetupPlayer(state);
     p.settlements[vertexId] = true;
     state.setupLastVertex = vertexId;
@@ -219,6 +220,7 @@ window.HL = window.HL || {};
   }
 
   function placeInitialRoad(state, edgeId) {
+    if(state.phase!=='setup'||state.setupExpecting!=='road'||legalInitialRoad(state).indexOf(edgeId)===-1)return false;
     var p = currentSetupPlayer(state);
     p.roads[edgeId] = true;
     state.setupLastVertex = null;
@@ -238,6 +240,7 @@ window.HL = window.HL || {};
 
   // ====== Dice / resource production ======
   function rollDice(state) {
+    if(state.phase!=='play'||state.turnState!=='roll')return {ok:false,err:'Dice already rolled'};
     var d1 = Math.floor(state.rng() * 6) + 1;
     var d2 = Math.floor(state.rng() * 6) + 1;
     var sum = d1 + d2;
@@ -428,6 +431,7 @@ window.HL = window.HL || {};
   // ====== Building ======
   function buildSettlement(state, vertexId, free) {
     var p = state.players[state.currentPlayerIdx];
+    if(state.phase!=='play'||state.turnState!=='main'||HL.Board.legalSettlementVertices(state.board,state.players,p).indexOf(vertexId)===-1)return{ok:false,err:'Choose a connected, empty location'};
     if (!free && !canAfford(p.hand, COSTS.settlement)) return { ok: false, err: 'Insufficient resources' };
     if (Object.keys(p.settlements).length >= LIMITS.settlements) return { ok: false, err: 'Settlement limit reached' };
     if (!free) payCost(p.hand, COSTS.settlement, state.bank);
@@ -440,6 +444,7 @@ window.HL = window.HL || {};
 
   function buildCity(state, vertexId) {
     var p = state.players[state.currentPlayerIdx];
+    if(state.phase!=='play'||state.turnState!=='main')return{ok:false,err:'Finish current action first'};
     if (!p.settlements[vertexId]) return { ok: false, err: 'No settlement to upgrade' };
     if (!canAfford(p.hand, COSTS.city)) return { ok: false, err: 'Insufficient resources' };
     if (Object.keys(p.cities).length >= LIMITS.cities) return { ok: false, err: 'City limit reached' };
@@ -453,6 +458,7 @@ window.HL = window.HL || {};
 
   function buildRoad(state, edgeId, free) {
     var p = state.players[state.currentPlayerIdx];
+    if(state.phase!=='play'||(free?state.turnState!=='free-road':state.turnState!=='main')||HL.Board.legalRoadEdges(state.board,state.players,p.idx).indexOf(edgeId)===-1)return{ok:false,err:'Choose a connected, empty road'};
     if (!free && !canAfford(p.hand, COSTS.road)) return { ok: false, err: 'Insufficient resources' };
     if (Object.keys(p.roads).length >= LIMITS.roads) return { ok: false, err: 'Road limit reached' };
     if (!free) payCost(p.hand, COSTS.road, state.bank);
@@ -465,6 +471,7 @@ window.HL = window.HL || {};
 
   function buyDev(state) {
     var p = state.players[state.currentPlayerIdx];
+    if(state.phase!=='play'||state.turnState!=='main')return{ok:false,err:'Finish current action first'};
     if (!canAfford(p.hand, COSTS.dev)) return { ok: false, err: 'Insufficient resources' };
     if (state.devDeck.length === 0) return { ok: false, err: 'Deck empty' };
     payCost(p.hand, COSTS.dev, state.bank);
@@ -483,12 +490,15 @@ window.HL = window.HL || {};
 
   function playDev(state, kind) {
     var p = state.players[state.currentPlayerIdx];
+    if(state.phase!=='play'||['knight','road','mono','plenty'].indexOf(kind)===-1)return{ok:false,err:'Card is not playable'};
+    if(kind==='road'&&(Object.keys(p.roads).length>=LIMITS.roads||!HL.Board.legalRoadEdges(state.board,state.players,p.idx).length))return{ok:false,err:'No roads available to place'};
+    if(kind==='plenty'&&totalCards(state.bank)===0)return{ok:false,err:'The bank is empty'};
     if (state.turnState !== 'main' && state.turnState !== 'roll') return { ok: false, err: 'Not your turn phase' };
     if (p.devPlayedThisTurn) return { ok: false, err: 'Already played a dev card this turn' };
-    if (kind !== 'knight' && state.turnState === 'roll') return { ok: false, err: 'Roll first' };
     if (!p.devHand[kind] || p.devHand[kind] <= 0) return { ok: false, err: 'No such card' };
     p.devHand[kind] -= 1;
     p.devPlayedThisTurn = true;
+    if(kind!=='knight')state._postDevState=state.turnState==='roll'?'roll':'main';
 
     if (kind === 'knight') {
       p.knightsPlayed += 1;
@@ -527,6 +537,7 @@ window.HL = window.HL || {};
   }
 
   function resolveMonopoly(state, res) {
+    if(state.turnState!=='pick-monopoly'||RES.indexOf(res)===-1)return false;
     var p = state.players[state.currentPlayerIdx];
     var total = 0;
     state.players.forEach(function(other) {
@@ -535,11 +546,15 @@ window.HL = window.HL || {};
       other.hand[res] = 0;
     });
     p.hand[res] += total;
-    state.turnState = 'main';
+    state.turnState = state._postDevState||'main';state._postDevState=null;
     pushEvent(state, p.name + ' monopolized ' + res + ' (' + total + ')');
   }
 
   function resolvePlenty(state, picks) {
+    if(state.turnState!=='pick-plenty'||!Array.isArray(picks))return{ok:false};
+    var need=Math.min(2,totalCards(state.bank)),take={};
+    if(picks.length!==need)return{ok:false};
+    for(var i=0;i<picks.length;i++){var r=picks[i];if(RES.indexOf(r)===-1)return{ok:false};take[r]=(take[r]||0)+1;if(take[r]>state.bank[r])return{ok:false};}
     var p = state.players[state.currentPlayerIdx];
     picks.forEach(function(res) {
       if (state.bank[res] > 0) {
@@ -547,12 +562,14 @@ window.HL = window.HL || {};
         state.bank[res] -= 1;
       }
     });
-    state.turnState = 'main';
-    pushEvent(state, p.name + ' took 2 resources');
+    state.turnState = state._postDevState||'main';state._postDevState=null;
+    pushEvent(state, p.name + ' took '+picks.length+' resources');
+    delete state._plentyPicked;return{ok:true};
   }
 
   // ====== Trade ======
   function tradeWithBank(state, give, gain) {
+    if(state.phase!=='play'||state.turnState!=='main'||give===gain||RES.indexOf(give)===-1||RES.indexOf(gain)===-1)return{ok:false,err:'Choose two different resources'};
     var p = state.players[state.currentPlayerIdx];
     // Compute rate for this resource: best port rate or 4
     var ports = HL.Board.playerPorts(state.board, p);
@@ -568,6 +585,8 @@ window.HL = window.HL || {};
   }
 
   function executePlayerTrade(state, fromIdx, toIdx, give, recv) {
+    if(state.phase!=='play'||state.turnState!=='main'||fromIdx!==state.currentPlayerIdx||fromIdx===toIdx||!state.players[toIdx])return{ok:false,err:'Trade is no longer available'};
+    if(!give||!recv||[give,recv].some(function(m){return Object.keys(m).some(function(r){return RES.indexOf(r)===-1||!Number.isSafeInteger(m[r])||m[r]<0;});})||totalCards(give)<1||totalCards(recv)<1)return{ok:false,err:'Choose resources on both sides'};
     var f = state.players[fromIdx], t = state.players[toIdx];
     for (var k in give) {
       if (f.hand[k] < give[k]) return { ok: false, err: 'Insufficient' };
@@ -583,6 +602,7 @@ window.HL = window.HL || {};
 
   // ====== End turn ======
   function endTurn(state) {
+    if(state.phase!=='play'||state.turnState!=='main')return false;
     var p = state.players[state.currentPlayerIdx];
     // Move pending dev cards into hand
     for (var k in p.devPending) {
@@ -599,42 +619,13 @@ window.HL = window.HL || {};
 
   // ====== Achievements ======
   function recomputeLongestRoad(state) {
-    // 1. Recompute everyone's current length (chains may have been broken)
-    state.players.forEach(function(p) {
-      p.longestRoadLen = HL.Board.longestRoadFor(state.board, state.players, p.idx);
-    });
-
-    var holder = state.longestRoadOwner !== null
-      ? state.players[state.longestRoadOwner] : null;
-
-    // 2. Holder drops the title if their chain is below 5
-    if (holder && holder.longestRoadLen < 5) {
-      pushEvent(state, holder.name + ' lost Longest Road');
-      state.longestRoadOwner = null;
-      state.longestRoadLen = 4;
-      holder = null;
-    }
-
-    // 3. Find the player (if any) with strictly greater than the current threshold
-    //    threshold = holder's length (must beat them), or 4 (must reach 5+)
-    var threshold = holder ? holder.longestRoadLen : 4;
-    var bestIdx = null, bestLen = threshold;
-    state.players.forEach(function(p) {
-      if (p.longestRoadLen > bestLen) {
-        bestLen = p.longestRoadLen;
-        bestIdx = p.idx;
-      }
-    });
-
-    if (bestIdx !== null && bestIdx !== state.longestRoadOwner) {
-      // Transfer (or first-take)
-      state.longestRoadOwner = bestIdx;
-      state.longestRoadLen = bestLen;
-      pushEvent(state, state.players[bestIdx].name + ' took Longest Road');
-    } else if (state.longestRoadOwner !== null) {
-      // Holder still holds — update recorded length in case they extended
-      state.longestRoadLen = state.players[state.longestRoadOwner].longestRoadLen;
-    }
+    state.players.forEach(function(p){p.longestRoadLen=HL.Board.longestRoadFor(state.board,state.players,p.idx);});
+    var max=Math.max.apply(null,state.players.map(function(p){return p.longestRoadLen;}));
+    var tied=state.players.filter(function(p){return p.longestRoadLen===max;});
+    var old=state.longestRoadOwner;
+    var owner=max<5?null:tied.some(function(p){return p.idx===old;})?old:tied.length===1?tied[0].idx:null;
+    state.longestRoadOwner=owner;state.longestRoadLen=owner===null?4:max;
+    if(old!==owner)pushEvent(state,owner===null?'Longest Road is unclaimed':state.players[owner].name+' took Longest Road');
   }
 
   function recomputeLargestArmy(state) {
@@ -667,14 +658,13 @@ window.HL = window.HL || {};
   }
 
   function checkWin(state) {
-    for (var i = 0; i < state.players.length; i++) {
-      if (totalVP(state, state.players[i]) >= (state.winVP || 10)) {
+    var i=state.currentPlayerIdx;
+      if (state.phase==='play'&&totalVP(state, state.players[i]) >= (state.winVP || 10)) {
         state.phase = 'over';
         state.winnerIdx = i;
         pushEvent(state, state.players[i].name + ' wins!');
         return true;
       }
-    }
     return false;
   }
 
@@ -683,8 +673,29 @@ window.HL = window.HL || {};
     state.events.push({ msg: msg, t: Date.now() });
     if (state.events.length > 100) state.events.shift();
   }
+  // Keep original geometry and every valid resource/piece; only reconstruct
+  // shared lookups lost during JSON serialization. Reject incomplete saves.
+  function restore(raw){try{
+    var s=JSON.parse(JSON.stringify(raw));
+    if(!s||!['setup','play','over'].includes(s.phase)||!Array.isArray(s.players)||s.players.length!==4||!s.board||s.board.tiles.length!==19||!Array.isArray(s.board.vertices)||!Array.isArray(s.board.edges))return null;
+    var b=s.board;b.verticesById={};b.edgesById={};b.tilesByKey={};
+    b.vertices.forEach(function(v){if(!v.id||!Number.isFinite(v.x)||!Number.isFinite(v.y)||!Array.isArray(v.adjEdges)||!Array.isArray(v.adjVerts))throw Error();b.verticesById[v.id]=v;});
+    b.edges.forEach(function(e){if(!b.verticesById[e.v1]||!b.verticesById[e.v2])throw Error();b.edgesById[e.id]=e;});
+    b.tiles.forEach(function(t){if(!['wood','brick','sheep','wheat','ore','desert'].includes(t.res)||!t.vertexIds.every(function(v){return b.verticesById[v];}))throw Error();b.tilesByKey[t.q+','+t.r]=t;});
+    s.players.forEach(function(p,i){if(p.idx!==i||!['red','blue','orange','white'].includes(p.color)||typeof p.name!=='string')throw Error();p.name=p.name.slice(0,24);['hand','devHand','devPending'].forEach(function(k){var keys=k==='hand'?RES:['knight','vp','road','mono','plenty'];if(!p[k]||keys.some(function(r){return !Number.isSafeInteger(p[k][r])||p[k][r]<0;})||Object.keys(p[k]).some(function(r){return !keys.includes(r);}))throw Error();});['settlements','cities','roads'].forEach(function(k){if(!p[k]||Object.keys(p[k]).some(function(id){return !(k==='roads'?b.edgesById[id]:b.verticesById[id]);}))throw Error();});});
+    if(!RES.every(function(r){return Number.isSafeInteger(s.bank[r])&&s.bank[r]>=0&&s.players.every(function(p){return Number.isSafeInteger(p.hand[r]);});})||!Number.isInteger(s.currentPlayerIdx)||!s.players[s.currentPlayerIdx])return null;
+    if(s.phase==='setup'&&(!Array.isArray(s.setupOrder)||!s.players[s.setupOrder[s.setupIndex]]||!['settlement','road'].includes(s.setupExpecting)))return null;
+    if(!Array.isArray(s.devDeck)||!Array.isArray(s.discardQueue))return null;
+    if(!['roll','main','robber-discard','robber-move','robber-steal','pick-monopoly','pick-plenty','free-road'].includes(s.turnState)||!Array.isArray(b.ports)||b.ports.some(function(p){return !b.verticesById[p.v1]||!b.verticesById[p.v2]||!Number.isFinite(p.iconX)||!Number.isFinite(p.iconY);}))return null;
+    if(s.turnState==='robber-discard'){var dc=s.discardCurrent;if(!dc||!s.players[dc.idx]||!Number.isSafeInteger(dc.need)||dc.need<0||dc.need>totalCards(s.players[dc.idx].hand))return null;var sel=s._discardSelected;if(sel&&(!RES.every(function(r){return Number.isSafeInteger(sel[r])&&sel[r]>=0&&sel[r]<=s.players[dc.idx].hand[r];})||totalCards(sel)>dc.need))delete s._discardSelected;}
+    if(s.turnState.indexOf('robber-')===0&&!s.players[s.robberMover])return null;
+    if(s._plentyPicked&&(!Array.isArray(s._plentyPicked)||s._plentyPicked.length>2||s._plentyPicked.some(function(r){return !RES.includes(r);})))delete s._plentyPicked;
+    s.events=Array.isArray(s.events)?s.events.slice(-100):[];s.diceHistory=Array.isArray(s.diceHistory)?s.diceHistory:[];s.rng=HL.Board.mulberry32(((s.seed||1)^Date.now())>>>0);return s;
+  }catch(e){return null;}}
 
   HL.Game = {
+    restore:restore,
+    checkWin:checkWin,
     RES: RES,
     COSTS: COSTS,
     LIMITS: LIMITS,

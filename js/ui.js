@@ -18,6 +18,7 @@ window.HL = window.HL || {};
   // onCancel: () => void
   // label: shown in mode banner
   var cursor = null;
+  var latestState=null;
 
   // Popover state — only one open at a time
   var openPopover = null;
@@ -32,6 +33,8 @@ window.HL = window.HL || {};
   // ===== Navigation =====
   function go(screenId, opts) {
     opts = opts || {};
+    if(screenId!==current)closePopover(true);
+    if(opts.history===false)history=[];
     if (current && opts.history !== false) history.push(current);
     Object.values(screens).forEach(function(s){ s.classList.add('hidden'); });
     if (screens[screenId]) {
@@ -56,19 +59,21 @@ window.HL = window.HL || {};
 
   // ===== Focus =====
   function focusFirst(container) {
-    var el = container.querySelector('.focusable:not([disabled]):not(.hidden)');
+    var preferred=container.id==='setup'?container.querySelector('[data-action=start-game]'):container.id==='game'?document.getElementById('btn-primary'):null;
+    var el = preferred&&!preferred.disabled?preferred:visibleFocus(container)[0];
     if (el) el.focus();
   }
+  function visibleFocus(container){return Array.from(container.querySelectorAll('.focusable:not([disabled])')).filter(function(el){return el.getClientRects().length&&!el.closest('.hidden');});}
+  function focusScope(){var consent=document.getElementById('trade-consent');if(consent&&!consent.classList.contains('hidden'))return consent;var handoff=document.getElementById('handoff-overlay');return handoff&&!handoff.classList.contains('hidden')?handoff:openPopover||screens[current];}
+  function tabFocus(reverse){var list=visibleFocus(focusScope());if(!list.length)return;var i=list.indexOf(document.activeElement);list[(i+(reverse?-1:1)+list.length)%list.length].focus();}
+  function resetInteraction(){cursor=null;closePopover(true);hideBanner();hideCursorHint();HL.Render.clearOverlays(document.getElementById('board-svg'));}
   function moveFocus(dir) {
     // If a popover is open, scope focus to it
     var container;
-    if (openPopover) container = openPopover;
-    else container = screens[current];
+    container=focusScope();
     if (!container) return;
 
-    var focusables = Array.from(
-      container.querySelectorAll('.focusable:not([disabled]):not(.hidden)')
-    );
+    var focusables = visibleFocus(container);
     if (focusables.length === 0) return;
     var cur = document.activeElement;
     var idx = focusables.indexOf(cur);
@@ -118,6 +123,9 @@ window.HL = window.HL || {};
     el.classList.remove('hidden');
     el._mandatory = !!opts.mandatory;
     openPopover = el;
+    var pause=el.querySelector('.required-pause');
+    if(!pause){pause=document.createElement('button');pause.className='pop-item focusable required-pause';pause.dataset.action='pause';pause.textContent='Menu';el.appendChild(pause);}
+    pause.classList.toggle('hidden',!el._mandatory);
     // Hide its cancel item if mandatory
     var cancelBtn = el.querySelector('.cancel-item');
     if (cancelBtn) cancelBtn.style.display = el._mandatory ? 'none' : '';
@@ -141,6 +149,7 @@ window.HL = window.HL || {};
 
   // ===== Placement cursor mode =====
   function startVertexPick(state, candidates, opts) {
+    closePopover(true);
     cursor = {
       mode: 'vertex-pick',
       candidates: candidates,
@@ -153,9 +162,12 @@ window.HL = window.HL || {};
     HL.Render.showVertexCandidates(document.getElementById('board-svg'), state, candidates, cursor.cursorId);
     showBanner(cursor.label, cursor.mandatory);
     showCursorHint('↑↓←→ to move · Enter to confirm');
+    document.getElementById('board-control').focus();
+    updateContext(state);
   }
 
   function startEdgePick(state, candidates, opts) {
+    closePopover(true);
     cursor = {
       mode: 'edge-pick',
       candidates: candidates,
@@ -168,9 +180,12 @@ window.HL = window.HL || {};
     HL.Render.showEdgeCandidates(document.getElementById('board-svg'), state, candidates, cursor.cursorId);
     showBanner(cursor.label, cursor.mandatory);
     showCursorHint('↑↓←→ to move · Enter to confirm');
+    document.getElementById('board-control').focus();
+    updateContext(state);
   }
 
   function startTilePick(state, candidates, opts) {
+    closePopover(true);
     cursor = {
       mode: 'tile-pick',
       candidates: candidates,
@@ -183,6 +198,8 @@ window.HL = window.HL || {};
     HL.Render.showTileCursor(document.getElementById('board-svg'), state, candidates, cursor.cursorId);
     showBanner(cursor.label, cursor.mandatory);
     showCursorHint('↑↓←→ to move · Enter to confirm');
+    document.getElementById('board-control').focus();
+    updateContext(state);
   }
 
   function cancelCursor() {
@@ -197,6 +214,8 @@ window.HL = window.HL || {};
     hideCursorHint();
     HL.Render.clearOverlays(document.getElementById('board-svg'));
     if (cb) cb();
+    document.getElementById('btn-menu').focus();
+    if(latestState)updateContext(latestState);
   }
 
   function isCursorActive() { return !!cursor; }
@@ -227,18 +246,14 @@ window.HL = window.HL || {};
     if (pick) {
       cursor.cursorId = pick.id;
       updateCursorVisual(state);
+      return true;
     } else {
-      // Wrap: pick the furthest in the opposite direction
-      var inv = { up: 'down', down: 'up', left: 'right', right: 'left' }[dir];
-      var wrap = HL.Board.pickDirectional(others, curObj.x, curObj.y, inv);
-      if (wrap) {
-        cursor.cursorId = wrap.id;
-        updateCursorVisual(state);
-      }
+      return false;
     }
   }
 
   function updateCursorVisual(state) {
+    updateContext(state);
     var svg = document.getElementById('board-svg');
     if (cursor.mode === 'vertex-pick') {
       HL.Render.showVertexCandidates(svg, state, cursor.candidates, cursor.cursorId);
@@ -306,7 +321,19 @@ window.HL = window.HL || {};
   }
 
   // ===== Updates =====
+  function updateContext(state){
+    latestState=state;
+    var local=state.localHumanIdx||0,summary=document.getElementById('game-summary');
+    summary.innerHTML=state.players.filter(function(p){return p.idx!==local;}).map(function(p){return '<div class="summary-player" style="--player-color:'+HL.Render.PLAYER_HEX[p.color].light+'"><b>'+esc(p.name)+'</b>'+HL.Game.visibleVP(state,p)+' VP · '+HL.Game.totalCards(p.hand)+' cards</div>';}).join('');
+    var c=document.getElementById('board-caption'),title='Your frontier',detail='Gather resources, connect roads, and grow your settlements.';
+    if(state.phase==='setup'){title='Found your first towns';detail='Choose a corner, then connect a road. Your second town supplies your starting resources.';}
+    else if(state.turnState==='roll'){title='A new turn';detail='Roll the dice to produce resources. You may play a development card before rolling.';}
+    else if(state.turnState==='main'){title='Build, trade, explore';detail='Open Build / Trade for available actions, or end your turn when you are ready.';}
+    if(cursor){var ids=[];if(cursor.mode==='vertex-pick')ids=state.board.verticesById[cursor.cursorId].tiles;else if(cursor.mode==='tile-pick')ids=[cursor.cursorId];else{var e=state.board.edgesById[cursor.cursorId];ids=state.board.verticesById[e.v1].tiles.filter(function(t){return state.board.verticesById[e.v2].tiles.includes(t);});}var tiles=state.board.tiles.filter(function(t){return ids.includes(t.id)});title=cursor.label.replace(/\s*\(.*/, '');detail=tiles.map(function(t){return t.res+(t.token?' '+t.token:'');}).join(' · ');}
+    c.innerHTML='<b>'+esc(title)+'</b><span>'+esc(detail)+'</span>';c.classList.toggle('has-location',!!cursor);
+  }
   function updateHud(state) {
+    updateContext(state);
     var p = state.players[state.localHumanIdx || 0]; // current human at device
     document.getElementById('rc-wood').textContent = p.hand.wood;
     document.getElementById('rc-brick').textContent = p.hand.brick;
@@ -337,7 +364,8 @@ window.HL = window.HL || {};
       ti.classList.toggle('active', isLocal);
     } else if (state.phase === 'play') {
       if (cp.idx === (state.localHumanIdx || 0)) {
-        ti.textContent = (cp.isAI ? cp.name + "'s turn" : 'Your turn — ' + state.turnState);
+        var labels={roll:'Roll the dice',main:'Build or trade','robber-discard':'Choose cards to discard','robber-move':'Move the robber','robber-steal':'Choose who to steal from','pick-monopoly':'Choose a resource','pick-plenty':'Choose your resources','free-road':'Place your free road'};
+        ti.textContent = (cp.isAI ? cp.name + "'s turn" : labels[state.turnState]||'Your turn');
         ti.classList.toggle('active', !cp.isAI);
       } else {
         ti.textContent = cp.name + "'s turn";
@@ -375,9 +403,10 @@ window.HL = window.HL || {};
       }
     }
 
-    // Menu button enabled only on local player's main turn
+    // Build actions and development cards; the separate Menu always stays usable.
     var btnMenu = document.getElementById('btn-menu');
-    btnMenu.disabled = !(state.phase === 'play' && cp.idx === localIdx && !cp.isAI && state.turnState === 'main');
+    btnMenu.disabled = !(state.phase === 'play' && cp.idx === localIdx && !cp.isAI && ['main','roll'].includes(state.turnState));
+    if(state.phase==='play'&&!['main','roll'].includes(state.turnState)){bp.textContent='Choose on board';bp.disabled=true;}
 
     // Dev chip on/off
     var devChip = document.getElementById('dev-chip');
@@ -403,7 +432,7 @@ window.HL = window.HL || {};
     setEnabled('build-road',
       HL.Game.canAfford(p.hand, HL.Game.COSTS.road) &&
       Object.keys(p.roads).length < HL.Game.LIMITS.roads &&
-      HL.Board.legalRoadEdges(state.board, state.players, 0).length > 0
+      HL.Board.legalRoadEdges(state.board, state.players, p.idx).length > 0
     );
     setEnabled('build-settlement',
       HL.Game.canAfford(p.hand, HL.Game.COSTS.settlement) &&
@@ -426,6 +455,10 @@ window.HL = window.HL || {};
     setEnabled('trade-bank', HL.Game.totalCards(p.hand) >= 2);
     setEnabled('trade-players', HL.Game.totalCards(p.hand) >= 1);
     setEnabled('end-turn', true);
+    if(state.turnState==='roll'){
+      ['build-road','build-settlement','build-city','buy-dev','trade-bank','trade-players','end-turn'].forEach(function(a){setEnabled(a,false)});
+      setEnabled('play-dev',hasPlayableDev);
+    }
   }
 
   function populateDevMenu(state) {
@@ -447,6 +480,7 @@ window.HL = window.HL || {};
         var btn = document.createElement('button');
         btn.className = 'pop-item focusable';
         btn.setAttribute('data-action', 'play-dev-' + k);
+        btn.disabled=p.devPlayedThisTurn;
         btn.innerHTML = '<span class="pop-label"><b>' + labels[k].name + '</b> ×' + n +
           '<br><span class="text-muted" style="font-size:11px">' + labels[k].desc + '</span></span>';
         list.appendChild(btn);
@@ -504,7 +538,7 @@ window.HL = window.HL || {};
     document.getElementById('discard-need').textContent = need;
     document.getElementById('discard-count').textContent = '0';
 
-    var selected = { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
+    var selected = state._discardSelected || { wood: 0, brick: 0, sheep: 0, wheat: 0, ore: 0 };
     state._discardSelected = selected;
 
     ['wood','brick','sheep','wheat','ore'].forEach(function(res) {
@@ -516,10 +550,11 @@ window.HL = window.HL || {};
       tile.innerHTML =
         '<span class="dt-icon res-icon res-' + res + '"></span>' +
         '<span class="dt-count">' + p.hand[res] + '</span>' +
-        '<span class="dt-selected">×0</span>';
+        '<span class="dt-selected">×'+selected[res]+'</span><span class="dt-name">'+res+'</span>';
       grid.appendChild(tile);
     });
     document.getElementById('btn-confirm-discard').disabled = true;
+    refreshDiscardScreen(state,p,need);
   }
 
   function refreshDiscardScreen(state, p, need) {
@@ -736,6 +771,7 @@ window.HL = window.HL || {};
   }
 
   HL.UI = {
+    esc:esc,
     init: init,
     go: go,
     back: back,
@@ -755,6 +791,10 @@ window.HL = window.HL || {};
     cancelCursor: cancelCursor,
     isCursorActive: isCursorActive,
     cursorMode: cursorMode,
+    cursorSnapshot:function(){return cursor?{mode:cursor.mode,id:cursor.cursorId,candidates:cursor.candidates.slice(),mandatory:cursor.mandatory,label:cursor.label}:null;},
+    popoverId:function(){return openPopover&&openPopover.id;},
+    resetInteraction:resetInteraction,
+    tabFocus:tabFocus,
 
     updateHud: updateHud,
     rollDiceAnim: rollDiceAnim,

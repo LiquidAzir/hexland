@@ -126,7 +126,7 @@ window.HL = window.HL || {};
 
       // Try to play a non-knight dev card if useful and haven't yet
       if (!p.devPlayedThisTurn) {
-        if (p.devHand.plenty > 0) {
+        if (p.devHand.plenty > 0 && HL.Game.totalCards(state.bank)>0) {
           var picks = chooseBestResources(state, p, 2);
           if (picks) { actions.push({ type: 'play-dev', kind: 'plenty', picks: picks }); break; }
         }
@@ -134,7 +134,7 @@ window.HL = window.HL || {};
           var res = chooseMonopolyResource(state, p);
           if (res) { actions.push({ type: 'play-dev', kind: 'mono', res: res }); break; }
         }
-        if (p.devHand.road > 0 && p.hand.wood + p.hand.brick < 2) {
+        if (p.devHand.road > 0 && p.hand.wood + p.hand.brick < 2 && Object.keys(p.roads).length<HL.Game.LIMITS.roads && HL.Board.legalRoadEdges(state.board,state.players,p.idx).length) {
           actions.push({ type: 'play-dev', kind: 'road' });
           break;
         }
@@ -237,8 +237,9 @@ window.HL = window.HL || {};
     var picks = [];
     for (var i = 0; i < count; i++) {
       var most = neededResource(state, p, picks);
-      if (most) picks.push(most);
-      else picks.push('wheat');
+      var available=Object.keys(state.bank).filter(function(r){return state.bank[r]>picks.filter(function(k){return k===r;}).length;});
+      if(!available.length)break;
+      picks.push(available.includes(most)?most:available[0]);
     }
     return picks;
   }
@@ -442,6 +443,7 @@ window.HL = window.HL || {};
   }
 
   HL.AI = {
+    chooseBestResources:chooseBestResources,
     pickInitialSettlement: pickInitialSettlement,
     pickInitialRoad: pickInitialRoad,
     takeTurn: takeTurn,

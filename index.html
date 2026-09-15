@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mrbd-web-app-capable" content="yes">
   <title>Hexland</title>
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="tabletop.css">
 </head>
 <body>
   <div id="app">
@@ -131,7 +133,9 @@
         </div>
       </div>
 
-      <div class="board-wrap">
+      <div id="game-summary" class="phone-summary" aria-label="Players"></div>
+      <div class="board-wrap focusable" id="board-control" tabindex="0" role="button" data-action="confirm-location" aria-label="Board: arrows choose a legal location, select confirms">
+        <canvas id="board-art" aria-hidden="true"></canvas>
         <svg id="board-svg" viewBox="-260 -235 520 470" preserveAspectRatio="xMidYMid meet"></svg>
         <div class="board-overlay" id="board-overlay"></div>
         <div class="cursor-hint" id="cursor-hint"></div>
@@ -159,9 +163,10 @@
           </div>
         </div>
         <div class="action-strip" id="action-strip">
-          <button class="act-btn focusable" data-action="menu" id="btn-menu" title="Menu">☰</button>
+          <button class="act-btn focusable" data-action="pause" id="btn-pause">Menu</button>
+          <button class="act-btn focusable" data-action="menu" id="btn-menu">Build / Trade</button>
           <button class="act-btn primary focusable" data-action="primary" id="btn-primary">Roll</button>
-          <button class="act-btn focusable" data-action="players" id="btn-players" title="Players">●●●</button>
+          <button class="act-btn focusable" data-action="players" id="btn-players" title="Players">Scores</button>
         </div>
       </div>
 
@@ -235,17 +240,41 @@
         <button class="mode-cancel focusable" data-action="cancel-mode">Cancel</button>
       </div>
 
+      <div id="board-caption" class="board-caption"></div>
+
       <!-- toast for events -->
       <div class="event-toast hidden" id="event-toast"></div>
+    </div>
+
+    <div id="pause" class="screen hidden">
+      <header class="header"><h1>Expedition paused</h1></header>
+      <div class="pause-content">
+        <p class="section-label">HEXLAND · THE SETTLERS' COAST</p>
+        <h2>Your island is waiting.</h2>
+        <p>Your progress is saved on this device.</p>
+        <button class="menu-btn primary focusable" data-action="resume-game">Resume game</button>
+        <button class="menu-btn focusable" data-action="how-to-play">How to play</button>
+        <button class="menu-btn focusable" data-action="save-exit">Save &amp; main menu</button>
+      </div>
+    </div>
+
+    <div id="trade-consent" class="handoff-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="trade-consent-title">
+      <div class="handoff-inner">
+        <h2 id="trade-consent-title">Trade offer</h2>
+        <p id="trade-consent-detail"></p>
+        <button class="menu-btn primary focusable" data-action="consent-accept">Accept trade</button>
+        <button class="menu-btn focusable" data-action="consent-decline">Decline</button>
+      </div>
     </div>
 
     <!-- ============ DISCARD SCREEN (on 7) ============ -->
     <div id="discard" class="screen hidden">
       <header class="header">
+        <button class="back-btn focusable" data-action="pause">Menu</button>
         <h1>Robber! Discard <span id="discard-target">0</span></h1>
       </header>
       <div class="content">
-        <p class="discard-help">You have more than 7 cards. Select cards to discard.</p>
+        <p class="discard-help">Select cards to discard. Tap a resource to add one; at the limit, tap it again to clear that pile.</p>
         <div class="discard-grid" id="discard-grid"></div>
         <div class="discard-status">
           Selected: <span id="discard-count">0</span> / <span id="discard-need">0</span>
@@ -531,6 +560,7 @@
   <script src="js/ai.js?v=5"></script>
   <script src="js/game.js?v=5"></script>
   <script src="js/render.js?v=5"></script>
+  <script src="js/art.js?v=coast-1"></script>
   <script src="js/ui.js?v=5"></script>
   <script src="js/app.js?v=5"></script>
 </body>
